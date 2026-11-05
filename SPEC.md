@@ -9,7 +9,8 @@ Sources read: `end-to-end-heart-disease-classification (1).ipynb` (87 cells, all
 
 ## 0. Decisions
 
-1. Deliverables: `heart_disease_pitch_gold_standard.ipynb`, `heart_disease_pipeline.joblib`, `app.py`, `heart.py` (a shared module), `tests/smoke_test.py`, `requirements.txt`. The original notebook is not changed.
+1. Deliverables: the `cardiotriage/` package (7 modules, §8), `heart_disease_pitch_gold_standard.ipynb` (the single combiner), `artifacts/heart_disease_pipeline.joblib`, `app.py`, `tests/smoke_test.py`, `requirements.txt`. The original notebook is not changed.
+   **Why a package instead of one notebook (decided 2026-11-06):** the app and the test import the same code as training, so there is one source of truth; the logic is unit-testable; the notebook stays a readable story of markdown and short calls (Assignment.md style).
 2. Python **3.11** venv in `.venv/` (installed at `C:\Users\USER\AppData\Local\Programs\Python\Python311`).
 3. **The source of truth is UCI `processed.cleveland.data`** (original codes, `?` = missing, `disease = num > 0`). The Kaggle CSV is loaded only to prove that it is re-coded and label-flipped (T1/T2).
 4. The use case is clinical decision support for triage, not diagnosis. A clinician stays in the loop.
@@ -114,8 +115,19 @@ Turn the course notebook into a pitch-ready proof of concept that scores full ma
 
 ## 4. Scope
 
-### `heart.py` (shared by the notebook, app, and test, so there is one source of truth)
-`COLUMNS`, `NUMERIC/ORDINAL/NOMINAL/BINARY`, the UCI code→label maps, `load_cleveland(path)`, `validate(df)` (the data contract: ranges and allowed codes; raises `ValueError`), `build_pipeline(model)`, `contributions(pipe, row)` (log-odds contribution per feature for linear models), and `triage(p, thresholds)`.
+### `cardiotriage/` package (shared by the notebook, app, and test, so there is one source of truth)
+
+| Module | Responsibility | Imports from package |
+|---|---|---|
+| `config.py` | Constants only: paths, `SEED`, feature groups (`NUMERIC/ORDINAL/NOMINAL/BINARY`), UCI code→label maps, `RECALL_TARGET` | nothing |
+| `data.py` | `load_cleveland/hungarian/kaggle`, `?`→NaN, de-dupe, `disease = num>0`, `validate(df)` (the data contract; raises `ValueError`), `kaggle_vs_uci()` (T1/T2 proof) | `config` |
+| `features.py` | Domain-feature functions (module-level, picklable) and `build_preprocessor()` | `config` |
+| `models.py` | `MODEL_ZOO` (Dummy, LR, KNN, RF, XGBoost), `SEARCH_SPACES`, `build_pipeline(model, use_fe)` | `config`, `features` |
+| `evaluation.py` | `make_split`, `make_cv`, `cv_table`, `corrected_ttest`, `tune`, `learning_curve_table`, `threshold_sweep`, `net_benefit`, `bootstrap_ci` | `config`, `models` |
+| `triage.py` | Inference: `pick_thresholds`, `triage(p, thresholds)` → tier + action, `contributions(pipe, patient)` | `config`, `data` |
+| `plots.py` | Every chart (EDA and evaluation); the notebook only calls `plots.*` | `config` |
+
+`__init__.py` is empty, so `app.py` never loads `evaluation`, `models`, or `plots`. The smoke test enforces this.
 
 ### `heart_disease_pitch_gold_standard.ipynb` (section order mirrors Assignment.md)
 
@@ -135,12 +147,12 @@ Turn the course notebook into a pitch-ready proof of concept that scores full ma
 13. **External validation (stretch):** train on Cleveland using the 10 features Hungary records reliably (drop `ca`, `thal`, `slope`); score `processed.hungarian.data` (n=294, a different hospital) and report the AUC/recall drop honestly. Switzerland and VA are not used (`chol` is coded 0 = missing, and >50% of the stress-test fields are missing).
 14. **Interpretation:** permutation importance + standardized LR coefficients; check them against cardiology knowledge.
 15. **Limitations** (T15–T17), **clinical/business impact**, **next steps**, and a short **model card** (intended use, out of scope, metrics, data, caveats).
-16. **Serialize** `{"pipeline", "thresholds", "features", "metrics", "versions"}` → `heart_disease_pipeline.joblib`.
+16. **Serialize** `{"pipeline", "thresholds", "features", "metrics", "versions"}` → `artifacts/heart_disease_pipeline.joblib` (+ `artifacts/metrics.json`).
 
 Selection rule: the best CV ROC-AUC wins. **If LR is within 1 SD of the best, ship LR** (interpretable, exact per-patient contributions, well calibrated). If a tree model wins by more than 1 SD, add `shap` for its explanations (this is an ask-first dependency).
 
 ### `app.py` (Streamlit)
-Sidebar form with clinical labels and valid ranges; 4 **preset patients** from the test set (clear high-risk, clear low-risk, borderline, the missed patient); outputs are risk %, a colour-coded tier with its action, the top contributing factors (for LR these are the linear-model SHAP values, computed exactly without the library), a **what-if** comparison against the previous input, and a disclaimer. The model loads once via `st.cache_resource`; inputs go through `heart.validate()`. Out of scope: auth, a database, batch upload, deployment.
+Sidebar form with clinical labels and valid ranges; 4 **preset patients** from the test set (clear high-risk, clear low-risk, borderline, the missed patient); outputs are risk %, a colour-coded tier with its action, the top contributing factors (for LR these are the linear-model SHAP values, computed exactly without the library), a **what-if** comparison against the previous input, and a disclaimer. The model loads once via `st.cache_resource`; inputs go through `cardiotriage.data.validate()`; it imports only `config`, `data`, and `triage`. Out of scope: auth, a database, batch upload, deployment.
 
 ## 5. Tech stack
 Python 3.11 venv · pandas · numpy · scikit-learn · xgboost · matplotlib · seaborn · joblib · streamlit · jupyter + nbconvert. No SHAP unless the selection rule requires it. No imbalanced-learn (the classes are 54/46, so resampling is not justified; the notebook says so).
@@ -156,32 +168,36 @@ Python 3.11 venv · pandas · numpy · scikit-learn · xgboost · matplotlib · 
 py -3.11 -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/jupyter nbconvert --to notebook --execute --inplace heart_disease_pitch_gold_standard.ipynb
-.venv/Scripts/python tests/smoke_test.py
+.venv/Scripts/python -m tests.smoke_test      # run from the repo root so `cardiotriage` imports
 .venv/Scripts/streamlit run app.py
 ```
 
 ## 8. Project structure
 ```
-data/processed.cleveland.data       UCI original (source of truth)
-data/processed.hungarian.data       UCI, external validation
-data/heart-disease.csv              Kaggle copy (QA evidence only)
-heart.py                            shared constants, validation, pipeline, triage
-heart_disease_pitch_gold_standard.ipynb
-heart_disease_pipeline.joblib
-app.py
+cardiotriage/                       the package: all logic (see §4)
+  __init__.py                       empty on purpose
+  config.py  data.py  features.py  models.py  evaluation.py  triage.py  plots.py
+heart_disease_pitch_gold_standard.ipynb   the single combiner: story + calls into cardiotriage
+app.py                              Streamlit demo (imports config, data, triage only)
 tests/smoke_test.py                 assert-based, no pytest dependency
+data/raw/processed.cleveland.data   UCI original (source of truth)
+data/raw/processed.hungarian.data   UCI, external validation
+data/raw/heart-disease.csv          Kaggle copy (QA evidence only)
+artifacts/heart_disease_pipeline.joblib, artifacts/metrics.json
 requirements.txt
 end-to-end-heart-disease-classification (1).ipynb   untouched
 ```
 
 ## 9. Code style
 ```python
+# cardiotriage/config.py
 SEED = 42
 NUMERIC = ["age", "trestbps", "chol", "thalach", "oldpeak"]
 ORDINAL = ["ca"]
 NOMINAL = ["cp", "restecg", "slope", "thal"]
 BINARY = ["sex", "fbs", "exang"]
 
+# cardiotriage/models.py  (the preprocessor itself is built in features.py)
 def build_pipeline(model):
     pre = ColumnTransformer([
         ("num", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), NUMERIC + ORDINAL),
@@ -191,11 +207,11 @@ def build_pipeline(model):
     ])
     return Pipeline([("pre", pre), ("model", model)])
 ```
-Conventions: constants at the top; every code cell is preceded by a *Purpose* line and followed by an **Insight:** that contains a number; markdown never hard-codes a result that the cells don't print.
+Conventions: one responsibility per module; no cycles (§4 table); domain features are module-level functions, never lambdas, so the joblib unpickles in the app; the notebook cells only call package functions; every code cell is preceded by a *Purpose* line and followed by an **Insight:** that contains a number; markdown never hard-codes a result that the cells don't print.
 
 ## 10. Testing strategy
 - The notebook runs headless via nbconvert with **0 errors and 0 warnings**. Grep the outputs for `Warning`. Fix warnings at the cause; blanket `filterwarnings("ignore")` is not allowed.
-- `tests/smoke_test.py`: `validate()` accepts the clean data and rejects bad codes; the joblib loads; the presets give probabilities in [0, 1] and the expected tiers; contributions sum to logit − intercept.
+- `tests/smoke_test.py`: `validate()` accepts the clean data and rejects bad codes; the joblib loads in a fresh interpreter; the presets give probabilities in [0, 1] and the expected tiers; contributions sum to logit − intercept; importing `cardiotriage.triage` and reading `app.py` does not pull in `evaluation`, `models`, or `plots`.
 - Manual: `streamlit run app.py`, click every preset, try one invalid input.
 
 ## 11. Boundaries
