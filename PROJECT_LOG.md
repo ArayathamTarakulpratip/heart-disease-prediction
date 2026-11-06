@@ -205,6 +205,50 @@ Smoke tests went from 58 to 62. The notebook was re-run after these changes; the
 
 ---
 
+## Phases 5–9: rubric-audit follow-up (2026-11-06)
+
+A strict audit against the 30-mark rubric scored Problem Statement and Implementation at 21.3 of 24. These phases close every gap it found (Presentation was out of scope). Decisions: no move of the original notebook; nested CV in; pooling Hungary into training stays a roadmap item; nothing committed.
+
+| Phase | What changed | Key result |
+|---|---|---|
+| 5 Evidence and framing | Section 0 rebuilt in two layers (why CVD matters; why the angiography queue matters); one-line problem statement; formal prediction task; UCI dataset DOI | Patel et al. 2010: only 37.6% of 398,978 elective angiograms found obstructive disease. Al-Hijji et al. 2019: 8.2 major complications per 10,000 diagnostic catheterisations. Pope 2000 wording corrected (the "women under 55" finding covers all acute ischaemia). No citable cost per procedure, so impact is in patients and slots |
+| 6 Comparison and math | PR-AUC in every CV table; one-line math per model family; new §9.2 compares the tuned models at their own recall-0.90 cut-off | At recall 0.901, specificity: logistic regression 0.679, XGBoost 0.672, KNN 0.603, random forest 0.565. 6 sick patients are missed by all four models, so the misses come from the data |
+| 7 Honest tuning | Nested CV (§9.3) for the selected model and the runner-up; caveat on the cut-offs in §10; §15.3 split into accuracy levers (each with its evidence) and deployment | Nested ROC-AUC 0.909 vs tuned 0.900 (XGBoost 0.905 vs 0.897): no detectable tuning optimism. All four models would have added ~2 minutes, over the 3-minute budget |
+| 8 Impact | §10.3 queue-gain curve and per-1,000 table; §15.2 now a code cell plus checked Insight, framed as benefit (earlier care, 368 healthy patients per 1,000 spared a priority angiogram) against price (45.5 sick patients per 1,000 left in Low, recall 0.778 for women vs 0.925 for men); avoided complications are only ≈ 0.3 per 1,000, so the gain is time and slots, not avoided harm | First 40% of slots serve 76.6% of sick patients (40% in arrival order); per 1,000 referred patients, 421.5 are High (359.5 sick) and 413.2 Low (45.5 sick) |
+| 9 Demo and repo | `README.md`, `DEMO.md` (figures produced by driving the app with `AppTest`), duplicate import removed, SPEC v3 and STRUCTURE updated | Demo: High 99.3%, Low 4.0% (with the caution note for women), Borderline 29.6% → 74.7% when `ca` goes 0 → 2, missed patient 6.3%, age 10 rejected |
+
+**New code (tests first):** `evaluation.operating_points`, `evaluation.nested_cv` (reuses the search that `tune` builds), `evaluation.queue_gain`, `plots.confusion_grid` (shares its drawing with `plots.confusion`), `plots.queue_gain`; `SCORING` gained `pr_auc`. `evaluation` now also imports `triage` (for `pick_thresholds`); there is no cycle.
+
+**Checked.** Smoke tests went from 62 to 68 (each new function's test was written first and seen failing; three deliberate code breaks were all caught). After every phase: headless run, `check_notebook` clean, all smoke tests pass, and every earlier code cell's text output compared with the previous run (identical, apart from the new PR-AUC column).
+
+
+**Phase 10 (2026-11-07): problem importance and clarity.** Section 0 gained the waiting-list harm figure (Natarajan *CMAJ* 2002: 1.4% of 8,030 patients had a major event while waiting) and a Thailand layer (IHD mortality trend, survival linked to angiography access, 36.1% normal elective angiograms in one provincial hospital). §1 now frames the work as two stages, with Stage 1 (10 features, no imaging, validated in Hungary in §13) and Stage 2 (13 features, the main model), which answers "if imaging is done, why predict the angiogram?". Markdown only; no code or outputs changed. A public-payer price per angiogram still could not be cited (SPEC §6), so impact stays in patients and slots.
+
+**Phase 11 (2026-11-07): second rubric audit (importance, clarity, tuning).**
+
+| Gap | What changed | Key result |
+|---|---|---|
+| No money in the cost/benefit argument; queue evidence 1998–2008 | §0 gained the CMS CY 2026 Medicare payment per angiogram (CPT 93458, APC 5191: $3,312 OPPS, $1,708 ASC) and the BHF/NHS England waiting list (Sept 2025); new cost table after §15.2 | Angiography for High + Medium tiers only: $1,368,518 saved per 1,000 referred (OPPS), cost per sick patient found $7,220 → $4,703, with 45.5 sick per 1,000 deferred to follow-up |
+| EDA never showed why blood pressure and cholesterol are weak; Stage 1/2 dense | new §5.7 box plots with Mann-Whitney tests (reuses `plots.by_disease`); "What we carry into modelling" is now an EDA-finding → design-choice table; one-sentence summary of the two stages in §1 | Median blood pressure 130 in both groups, cholesterol 249 vs 234.5 (p ≈ 0.03), against p ≈ 1e-13 for max heart rate and ST depression |
+| No feature selection; only 30 search settings | new §9.5 drop-column CV + one-step backward elimination; §9.6 30 vs 100 settings; §15.3 item 3 updated | Only `ca` is indispensable (−0.030, p = 0.016); the 6-feature-smaller model is +0.007, p = 0.47, so all 13 kept. 100 settings: LR unchanged, XGBoost +0.003 |
+| Overclaim: "LR is best at the operating point" | §9.2 now prints healthy patients spared per model; Insight and README say LR and XGBoost are tied | 89 vs 88 of 131 healthy patients (one patient) |
+
+**Checked.** No package code changed. Headless run (about 1 min 45 s), `check_notebook` clean, smoke tests pass, `artifacts/metrics.json` byte-identical to before, so the shipped model, cut-offs and DEMO.md figures are unchanged.
+
+**Phase 11 (2026-11-07): recent and Thai evidence; one problem statement plus a circularity check.** An audit docked importance (queue-harm evidence 16–24 years old, money case US-only, Thai yield from one hospital) and clarity (`ca` "close to how the label is measured" and two "stages" read as two problem statements).
+
+| Gap | Change | Evidence |
+|---|---|---|
+| Old queue-harm evidence | §0 adds Tam et al. 2021 | 584,341 Ontario referrals; pandemic-era PCI referral HR 1.83 (1.47–2.27) for death while waiting |
+| Thai figure from one hospital | §0 adds national NHSO data, volume and capacity | Khananuraksa 2024: 37.6% of 141,605 UC angiograms led to no PCI or CABG; NHSO FY2025: 33,667 CAG-only; 72 PCI hospitals (Chandavimol 2025), about 1 per million vs 5.7 cath labs per million in ESC countries |
+| No Thai price | Searched NHSO, CGD fee schedule (scanned, unreadable), SSO 2026; none citable. §0 now names the transferable figure (angiograms avoided per 1,000) | SPEC §6 lists every source and what was not found |
+| "Stage 1 / Stage 2" = two problem statements | §1 rewritten: one problem (order the angiography queue after imaging) and a **no-imaging check**; new cell *Is the model reading the answer?* before §6; §13 retitled | 0.900 with imaging vs 0.846 without; 0.880 in Budapest |
+| Circularity defended only on paper | The no-imaging model and its cut-offs are saved in the artifact; the app has a *Circularity check* switch; DEMO step 6 | Borderline preset 29.6% with imaging, 57.0% without; the no-imaging model gives identical risk whatever `ca`, `thal`, `slope` are (new test) |
+
+**Checked.** Headless run 1 min 40 s, `check_notebook` clean, smoke tests 70/70 (2 new). Every existing figure in `metrics.json` unchanged; it gains `no_imaging_cv_roc_auc` 0.8459. App driven through the agent API with no console warnings; mutation (app scoring with the full model) caught by the new app test.
+
+---
+
 ## How to reproduce
 
 ```bash

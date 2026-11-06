@@ -2,7 +2,7 @@
 
 A map of the repo for team members. Read this first, then open the file you need.
 
-> **Status:** this is the planned layout (see `SPEC.md` and `tasks/todo.md`). Files marked 🔜 are not written yet; they appear as the tasks are completed.
+> **Status:** complete (see `SPEC.md` and `tasks/todo.md`). New here? Read [`README.md`](README.md) first.
 
 ## What the project does
 
@@ -30,11 +30,13 @@ heart-disease-prediction/
 │   ├── data.py                    Load data, clean it, check it (the "data contract")
 │   ├── features.py                Domain features and the preprocessing step
 │   ├── models.py                  The five models, their tuning ranges, and the full pipeline
-│   ├── evaluation.py              Split, cross-validation, metrics, significance test, tuning, thresholds, confidence intervals
+│   ├── evaluation.py              Split, cross-validation, metrics, significance test, tuning (incl. nested CV), operating points, queue gain, confidence intervals
 │   ├── triage.py                  Risk → tier + action, and "why this patient scored high"
 │   └── plots.py                   Every chart
 │
 ├── heart_disease_pitch_gold_standard.ipynb   The story: markdown + short calls into the package (sections 0–16 done)
+├── README.md                       Start here: the pitch, results and how to run
+├── DEMO.md                         Six-step live demo run-sheet for app.py
 ├── app.py                          Streamlit demo (run: .venv/Scripts/streamlit run app.py)
 ├── tests/smoke_test.py             Runner: runs every tests/test_*.py (or only the areas you name)
 ├── tests/test_<area>.py            The checks, one file per area: data, imports, models, evaluation,
@@ -57,7 +59,7 @@ heart-disease-prediction/
 | `data.py` | Get clean, trustworthy data | `load_cleveland()`, `load_hungarian()`, `load_kaggle()`, `validate()` (rejects impossible values), `kaggle_vs_uci()` (proves the Kaggle labels are flipped) |
 | `features.py` | Turn raw columns into model inputs | Domain features such as % of age-predicted max heart rate and the hypertension flag; scaling and one-hot encoding |
 | `models.py` | Define what we train | Dummy, Logistic Regression, KNN, Random Forest and XGBoost; tuning ranges; `build_pipeline()` |
-| `evaluation.py` | Measure how good a model is | Repeated cross-validation, the comparison table, the significance test, threshold sweep, decision-curve analysis, bootstrap confidence intervals |
+| `evaluation.py` | Measure how good a model is | Repeated cross-validation, the comparison table, the significance test, nested cross-validation, each model at its own clinical cut-off (`operating_points`), threshold sweep, decision-curve analysis, queue gain, bootstrap confidence intervals |
 | `triage.py` | Use the model on a patient | Pick the cut-offs, map a probability to a tier and action, list the factors behind a score |
 | `plots.py` | Draw the charts | EDA charts and evaluation charts, so notebook cells stay short |
 
@@ -67,7 +69,7 @@ Imports go one way only. A file may import the files to its left, never to its r
 
 ```
 config ◄── data
-config ◄── features ◄── models ◄── evaluation   (evaluation also uses data)
+config ◄── features ◄── models ◄── evaluation   (evaluation also uses data and triage)
 config ◄── plots
 config ◄── triage
 ```

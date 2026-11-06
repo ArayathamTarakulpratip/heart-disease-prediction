@@ -38,5 +38,20 @@ See `tasks/todo.md` (13 tasks, 5 checkpoints: A–E).
 | **Occurred:** `nbconvert` prints 81 joblib/loky `resource_tracker` KeyError tracebacks to the console on Windows (parallel workers inside a Jupyter kernel), plus two Jupyter warnings | Low | They never reach a cell output and results are identical across runs, so the notebook check stays clean. Not fixed by disabling memmapping or shutting the executor down (both tried). If a silent console is wanted, set `config.N_JOBS = 1` (slower run). |
 | **Occurred:** no test patient with disease was missed, so the "missed by the model" demo preset cannot come from the test set | Low | The preset is the sick training patient with the lowest out-of-fold risk (patient 145); the notebook says so |
 
+## Phases 5–9 (rubric audit follow-up, 2026-11-06)
+Goal: full marks on Problem Statement and Implementation (Presentation excluded). Tasks 14–26 and Checkpoints F–J are in `tasks/todo.md`.
+
+| Phase | Tasks | Checkpoint |
+|---|---|---|
+| P5 Evidence and framing | 14 verify statistics · 15 reframe cells 0/1/2/5 | F: headless clean |
+| P6 Comparison and math | 16 PR-AUC · 17 math per model · 18 comparison at the clinical cut-off | G: original outputs unchanged except `pr_auc` |
+| P7 Tuning honesty | 19 nested CV · 20 caveat + accuracy roadmap | H: runtime ≤ 3 min |
+| P8 Impact | 21 queue gain + per-1,000 table · 22 §15.2 with numbers | I: all new numbers checked |
+| P9 Demo, repo, docs | 23 DEMO.md · 24 README · 25 nit · 26 docs | J: fresh run, two runs identical |
+
+Decisions: no legacy move; nested CV in; Hungary pooling stays roadmap; no commits.
+
+Extra risks: an unverifiable cost/capacity figure is dropped (impact stated in slots and patients); nested CV over the runtime budget falls back to LR + runner-up; if another model beats LR at recall 0.90 the notebook says so.
+
 ## Open questions
 None blocking.

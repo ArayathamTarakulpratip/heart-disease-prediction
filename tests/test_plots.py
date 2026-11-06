@@ -67,3 +67,18 @@ def test_evaluation_plots_return_figures_without_warnings():
     _no_warning_figure(plots.roc_pr_calibration, evaluation.curves(y, p))
     _no_warning_figure(plots.confusion, evaluation.confusion(y, p >= 0.5))
     _no_warning_figure(plots.importance, pd.Series({"ca": 0.1, "cp": 0.05, "age": 0.01}), "Permutation importance")
+
+
+def test_confusion_grid_draws_one_panel_per_model_without_warnings():
+    from cardiotriage import evaluation, plots
+    y = [1, 1, 0, 0, 1, 0]
+    cms = {m: evaluation.confusion(y, flag) for m, flag in
+           {"A": [1, 1, 0, 1, 0, 0], "B": [1, 1, 1, 1, 1, 0], "C": [0, 1, 0, 0, 1, 0]}.items()}
+    fig = _no_warning_figure(plots.confusion_grid, cms)
+    assert [ax.get_title() for ax in fig.axes] == ["A", "B", "C"]
+
+
+def test_queue_gain_plot_draws_without_warnings():
+    from cardiotriage import evaluation, plots
+    g = evaluation.queue_gain([1, 0, 1, 0, 0, 1], [0.9, 0.8, 0.7, 0.3, 0.2, 0.1], [0.25, 0.5, 0.75, 1.0])
+    _no_warning_figure(plots.queue_gain, g)

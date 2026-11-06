@@ -130,6 +130,19 @@ def decision_curve(nb: pd.DataFrame):
     return fig
 
 
+def queue_gain(gain: pd.DataFrame):
+    """Cumulative share of sick patients served as the angiography queue fills: risk order vs arrival order."""
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.plot(100 * gain["slots"], 100 * gain["model"], color=PALETTE["Disease"], lw=2, label="queue ordered by model risk")
+    ax.plot(100 * gain["slots"], 100 * gain["first_come_first_served"], color="grey", ls="--",
+            label="first come, first served")
+    ax.set(title="Who gets the first angiography slots? (out-of-fold)", xlabel="Share of queue served (%)",
+           ylabel="Share of all sick patients served (%)", xlim=(0, 100), ylim=(0, 102))
+    ax.legend(fontsize=8, loc="lower right")
+    fig.tight_layout()
+    return fig
+
+
 def roc_pr_calibration(c: dict):
     """ROC, precision-recall and calibration curves from evaluation.curves()."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.2))
@@ -151,9 +164,7 @@ def roc_pr_calibration(c: dict):
     return fig
 
 
-def confusion(cm: pd.DataFrame):
-    """Confusion matrix with true status as rows and the model's call as columns (labels spelled out, T11)."""
-    fig, ax = plt.subplots(figsize=(4.8, 3.8))
+def _draw_confusion(ax, cm: pd.DataFrame, title: str) -> None:
     values = cm.to_numpy()
     ax.imshow(values, cmap="Blues")
     for (i, j), v in pd.DataFrame(values).stack().items():
@@ -161,8 +172,25 @@ def confusion(cm: pd.DataFrame):
                 color="white" if v > values.max() / 2 else "black")      # readable on dark cells
     ax.set_xticks(range(cm.shape[1]), cm.columns)
     ax.set_yticks(range(cm.shape[0]), cm.index)
-    ax.set(title="Test set at the low cut-off", xlabel="Model's call", ylabel="True status")
+    ax.set(title=title, xlabel="Model's call", ylabel="True status")
     ax.grid(False)
+
+
+def confusion(cm: pd.DataFrame):
+    """Confusion matrix with true status as rows and the model's call as columns (labels spelled out, T11)."""
+    fig, ax = plt.subplots(figsize=(4.8, 3.8))
+    _draw_confusion(ax, cm, "Test set at the low cut-off")
+    fig.tight_layout()
+    return fig
+
+
+def confusion_grid(cms: dict):
+    """One confusion matrix per model, side by side ({model name: evaluation.confusion table})."""
+    fig, axes = plt.subplots(1, len(cms), figsize=(4.2 * len(cms), 3.6), squeeze=False)
+    for ax, (name, cm) in zip(axes[0], cms.items()):
+        _draw_confusion(ax, cm, name)
+    for ax in axes[0][1:]:
+        ax.set(ylabel=None, yticklabels=[])                               # row labels once, on the left
     fig.tight_layout()
     return fig
 

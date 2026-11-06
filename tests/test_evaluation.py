@@ -41,6 +41,7 @@ def test_cv_scores_returns_one_row_per_fold_with_all_metrics():
     s = evaluation.cv_scores(models.build_pipeline(LogisticRegression(max_iter=1000)), X, y)
     assert len(s) == 50 and set(evaluation.METRICS) <= set(s.columns), s.columns
     assert s["roc_auc"].between(0.5, 1).all() and s["brier"].between(0, 1).all()
+    assert "pr_auc" in evaluation.METRICS and s["pr_auc"].between(0, 1).all(), s.get("pr_auc")
 
 
 def test_corrected_ttest_p_value_is_a_probability_and_detects_a_big_gap():
@@ -153,3 +154,49 @@ def test_permutation_table_and_coefficients_cover_the_features():
     assert set(imp.index) == set(cfg.FEATURES) and imp.index[0] == imp.abs().idxmax()
     coef = evaluation.coefficients(pipe)
     assert len(coef) == len(pipe[:-1].get_feature_names_out()) and "age" in coef.index
+
+
+def test_operating_points_cut_each_model_at_its_own_recall_target():
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.neighbors import KNeighborsClassifier
+    from cardiotriage import config as cfg, data, evaluation, models
+    X, _, y, _ = evaluation.make_split(data.load_cleveland())
+    pipes = {"LR": models.build_pipeline(LogisticRegression(max_iter=1000)),
+             "KNN": models.build_pipeline(KNeighborsClassifier(n_neighbors=25))}
+    table, flags = evaluation.operating_points(pipes, X, y)
+    assert list(table.index) == ["LR", "KNN"] and list(flags.columns) == ["LR", "KNN"]
+    assert (table["recall"] >= cfg.RECALL_TARGET).all(), table["recall"]
+    assert table["pr_auc"].between(0, 1).all() and table["specificity"].between(0, 1).all()
+    assert flags.index.equals(y.index) and flags.dtypes.eq(bool).all()
+    # the table's numbers are the flags' numbers
+    sick = (y == 1).to_numpy()
+    for m in pipes:
+        assert np.isclose(table.loc[m, "recall"], flags[m][sick].mean())
+        assert np.isclose(table.loc[m, "missed_per_100"], 100 * (~flags[m] & sick).sum() / len(y))
+
+
+def test_nested_cv_gives_one_unbiased_score_per_outer_fold_and_is_deterministic():
+    from cardiotriage import data, evaluation
+    X, _, y, _ = evaluation.make_split(data.load_cleveland())
+    a = evaluation.nested_cv("Logistic Regression", X, y, n_iter=3)
+    b = evaluation.nested_cv("Logistic Regression", X, y, n_iter=3)
+    assert len(a) == 5 and np.all((a >= 0) & (a <= 1)), a
+    assert np.array_equal(a, b)
+
+
+def test_queue_gain_matches_a_hand_computed_queue():
+    from cardiotriage import evaluation
+    # 6 patients, 3 sick; the model ranks them 0 > 1 > 2 > 3 > 4 > 5
+    y = [1, 0, 1, 0, 0, 1]
+    p = [0.9, 0.8, 0.7, 0.3, 0.2, 0.1]
+    g = evaluation.queue_gain(y, p, [1 / 3, 0.5, 1.0]).set_index("slots")
+    # first 2 slots: patients 0, 1 -> 1 of 3 sick; first 3: 0, 1, 2 -> 2 of 3; all 6 -> 3 of 3
+    assert np.allclose(g["model"], [1 / 3, 2 / 3, 1.0]), g
+    assert np.allclose(g["first_come_first_served"], [1 / 3, 0.5, 1.0])
+
+
+def test_queue_gain_of_a_perfect_ranker_serves_every_sick_patient_first():
+    from cardiotriage import evaluation
+    y = [0, 1, 0, 1, 0, 1]
+    g = evaluation.queue_gain(y, y, [0.5])
+    assert g["model"].iloc[0] == 1.0

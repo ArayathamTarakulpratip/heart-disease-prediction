@@ -46,5 +46,6 @@
     0.8766,
     1.0
   ],
+  "no_imaging_cv_roc_auc": 0.8459,
   "hungary_roc_auc_10_features": 0.8804
 }

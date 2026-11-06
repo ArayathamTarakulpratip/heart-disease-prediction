@@ -117,6 +117,17 @@ with left:
     st.caption(f"Tiers: Low below {thresholds['low']:.1%} · Medium from {thresholds['low']:.1%} · "
                f"High from {thresholds['high']:.1%}. The low cut-off was set to catch at least "
                f"{cfg.RECALL_TARGET:.0%} of sick patients in validation.")
+    if st.toggle("Circularity check: also score without imaging", key="no_imaging",
+                 help="Re-scores this patient with a model that never sees `ca`, `thal` or `slope` "
+                      "(notebook Section 13), to show the main model is not just reading the imaging."):
+        check = artifact["no_imaging"]
+        risk_no_imaging = float(check["pipeline"].predict_proba(patient[cfg.FEATURES])[0, 1])
+        tier_no_imaging = triage.triage(risk_no_imaging, check["thresholds"])["tier"]
+        st.metric("Risk without imaging (no `ca`, `thal`, `slope`)", f"{risk_no_imaging:.1%}",
+                  delta=f"{100 * (risk_no_imaging - risk):+.1f} pts vs full model", delta_color="off")
+        st.caption(f"{tier_no_imaging} tier on its own cut-offs. Cross-validated ROC-AUC "
+                   f"{artifact['metrics']['no_imaging_cv_roc_auc']:.3f} without imaging vs "
+                   f"{artifact['metrics']['cv_roc_auc']['mean']:.3f} with it: most of the signal is there before imaging.")
     if previous is not None:
         changed = [c for c in cfg.FEATURES
                    if label(c, previous["inputs"][c]) != label(c, patient.iloc[0][c])]

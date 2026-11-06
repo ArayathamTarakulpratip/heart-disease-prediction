@@ -6,14 +6,16 @@ from sklearn.calibration import CalibratedClassifierCV, calibration_curve
 from sklearn.metrics import (accuracy_score, average_precision_score, brier_score_loss, make_scorer,
                              precision_recall_curve, precision_score, recall_score, roc_auc_score, roc_curve)
 from sklearn.model_selection import (RandomizedSearchCV, RepeatedStratifiedKFold, StratifiedKFold,
-                                     cross_val_predict, cross_validate, learning_curve, train_test_split)
+                                     cross_val_predict, cross_val_score, cross_validate, learning_curve,
+                                     train_test_split)
 
-from cardiotriage import config as cfg, data, models
+from cardiotriage import config as cfg, data, models, triage
 
 # Threshold metrics (recall, specificity, F1) use the default 0.5 cut-off here; the clinical cut-off is
-# chosen later from out-of-fold predictions. ROC-AUC and Brier score do not depend on any cut-off.
+# chosen later from out-of-fold predictions. ROC-AUC, PR-AUC and Brier score do not depend on any cut-off.
 SCORING = {
     "roc_auc": "roc_auc",
+    "pr_auc": "average_precision",
     "recall": "recall",
     "specificity": make_scorer(recall_score, pos_label=0),
     "f1": "f1",
@@ -101,15 +103,25 @@ def select_model(table: pd.DataFrame, metric: str = "roc_auc", prefer: str = "Lo
     return best
 
 
+def _search(name: str, n_iter: int, use_fe: bool) -> RandomizedSearchCV:
+    return RandomizedSearchCV(
+        models.zoo_pipeline(name, use_fe), models.SEARCH_SPACES[name], n_iter=n_iter, scoring="roc_auc",
+        cv=make_cv(n_repeats=2, seed=cfg.SEED + 1), random_state=cfg.SEED, n_jobs=cfg.N_JOBS, refit=True)
+
+
 def tune(name: str, X, y, n_iter: int = 30, use_fe: bool = False) -> RandomizedSearchCV:
     """Random search over models.SEARCH_SPACES[name], scored by ROC-AUC on a 5x2 CV of the training set.
 
     Uses different folds (seed + 1) from the 5x10 comparison CV, so tuning and reporting do not share splits.
     """
-    search = RandomizedSearchCV(
-        models.zoo_pipeline(name, use_fe), models.SEARCH_SPACES[name], n_iter=n_iter, scoring="roc_auc",
-        cv=make_cv(n_repeats=2, seed=cfg.SEED + 1), random_state=cfg.SEED, n_jobs=cfg.N_JOBS, refit=True)
-    return search.fit(X, y)
+    return _search(name, n_iter, use_fe).fit(X, y)
+
+
+def nested_cv(name: str, X, y, n_iter: int = 30, use_fe: bool = False) -> np.ndarray:
+    """ROC-AUC of the whole tuning procedure on 5 outer folds (seed + 2): each outer fold is scored by a model
+    whose settings were searched on the other 4 folds only, so the estimate is not inflated by tuning."""
+    outer = StratifiedKFold(cfg.CV_SPLITS, shuffle=True, random_state=cfg.SEED + 2)
+    return cross_val_score(_search(name, n_iter, use_fe), X, y, cv=outer, scoring="roc_auc")
 
 
 def calibrated(pipe, method: str = "sigmoid") -> CalibratedClassifierCV:
@@ -137,6 +149,24 @@ def oof_proba(pipe, X, y, n_repeats: int = cfg.CV_REPEATS) -> np.ndarray:
                               cv=StratifiedKFold(cfg.CV_SPLITS, shuffle=True, random_state=cfg.SEED + r))[:, 1]
             for r in range(n_repeats)]
     return np.mean(runs, axis=0)
+
+
+def operating_points(pipes: dict, X, y) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Each model at its OWN clinical cut-off: the highest one that keeps out-of-fold recall >= RECALL_TARGET.
+
+    Returns one row per model (cut-off, recall, specificity, PPV, missed per 100, out-of-fold PR-AUC) and a
+    frame of out-of-fold flags (True = at or above that model's own cut-off), one column per model, indexed like y.
+    """
+    rows, flags = {}, {}
+    for name, pipe in pipes.items():
+        p = oof_proba(pipe, X, y)
+        cut = triage.pick_thresholds(y, p)["low"]
+        row = threshold_sweep(y, p, [cut]).iloc[0]
+        rows[name] = {"threshold": cut, "recall": row["recall"], "specificity": row["specificity"],
+                      "ppv": row["ppv"], "missed_per_100": row["missed_per_100"],
+                      "pr_auc": average_precision_score(y, p)}
+        flags[name] = p >= cut
+    return pd.DataFrame(rows).T, pd.DataFrame(flags, index=y.index)
 
 
 def _rates(y, flag) -> dict:
@@ -171,6 +201,17 @@ def net_benefit(y, p, thresholds) -> pd.DataFrame:
         rows.append({"threshold": t,
                      "model": (flag & (y == 1)).sum() / n - (flag & (y == 0)).sum() / n * w,
                      "treat_all": prev - (1 - prev) * w, "treat_none": 0.0})
+    return pd.DataFrame(rows)
+
+
+def queue_gain(y, p, fractions) -> pd.DataFrame:
+    """Share of all sick patients served within the first `slots` share of the angiography queue when the
+    queue is ordered by risk (model), against first-come-first-served, which serves them in proportion."""
+    y = np.asarray(y)
+    order = np.argsort(-np.asarray(p, float), kind="stable")    # highest risk first; ties keep arrival order
+    served = np.cumsum(y[order]) / y.sum()
+    rows = [{"slots": f, "model": served[max(round(f * len(y)), 1) - 1], "first_come_first_served": f}
+            for f in fractions]
     return pd.DataFrame(rows)
 
 
