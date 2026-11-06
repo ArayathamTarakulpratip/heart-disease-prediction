@@ -1,0 +1,248 @@
+"""Measure how good a model is: split, cross-validation, metrics, significance, tuning, learning curve."""
+import numpy as np
+import pandas as pd
+from scipy import stats
+from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.metrics import (accuracy_score, average_precision_score, brier_score_loss, make_scorer,
+                             precision_recall_curve, precision_score, recall_score, roc_auc_score, roc_curve)
+from sklearn.model_selection import (RandomizedSearchCV, RepeatedStratifiedKFold, StratifiedKFold,
+                                     cross_val_predict, cross_validate, learning_curve, train_test_split)
+
+from cardiotriage import config as cfg, data, models
+
+# Threshold metrics (recall, specificity, F1) use the default 0.5 cut-off here; the clinical cut-off is
+# chosen later from out-of-fold predictions. ROC-AUC and Brier score do not depend on any cut-off.
+SCORING = {
+    "roc_auc": "roc_auc",
+    "recall": "recall",
+    "specificity": make_scorer(recall_score, pos_label=0),
+    "f1": "f1",
+    "brier": "neg_brier_score",
+    "accuracy": "accuracy",
+}
+METRICS = list(SCORING)
+
+
+def make_split(df: pd.DataFrame):
+    """De-duplicate, then a stratified 80/20 split. The test part is locked until the final evaluation."""
+    df = data.deduplicate(df)
+    return train_test_split(df[cfg.FEATURES], df[cfg.TARGET], test_size=cfg.TEST_SIZE,
+                            stratify=df[cfg.TARGET], random_state=cfg.SEED)
+
+
+def make_cv(n_splits: int = cfg.CV_SPLITS, n_repeats: int = cfg.CV_REPEATS, seed: int = cfg.SEED):
+    """Repeated stratified k-fold. Same seed -> same folds, so every model sees identical splits."""
+    return RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=seed)
+
+
+def metrics_at(y_true, y_pred) -> dict:
+    """Recall, specificity, precision and accuracy for hard predictions (1 = disease)."""
+    return {
+        "recall": recall_score(y_true, y_pred),
+        "specificity": recall_score(y_true, y_pred, pos_label=0),
+        "precision": precision_score(y_true, y_pred, zero_division=0),
+        "accuracy": accuracy_score(y_true, y_pred),
+    }
+
+
+def cv_scores(pipe, X, y, cv=None) -> pd.DataFrame:
+    """One row per fold, one column per metric (Brier reported as a positive error)."""
+    if cv is None:
+        cv = make_cv()
+    res = cross_validate(pipe, X, y, cv=cv, scoring=SCORING, n_jobs=cfg.N_JOBS)
+    out = pd.DataFrame({m: res[f"test_{m}"] for m in METRICS})
+    out["brier"] = -out["brier"]
+    return out
+
+
+def cv_table(scores: dict) -> pd.DataFrame:
+    """{model name: cv_scores frame} -> one row per model with mean and SD of every metric."""
+    rows = {}
+    for name, s in scores.items():
+        rows[name] = {f"{m}_{stat}": getattr(s[m], stat)() for m in METRICS for stat in ("mean", "std")}
+    t = pd.DataFrame(rows).T
+    return t.rename(columns=lambda c: c.replace("_std", "_sd"))
+
+
+def format_table(table: pd.DataFrame, digits: int = 3) -> pd.DataFrame:
+    """cv_table output -> one 'mean ± sd' string column per metric, for display."""
+    metrics = [c[:-5] for c in table.columns if c.endswith("_mean")]
+    return pd.DataFrame({m: [f"{a:.{digits}f} ± {b:.{digits}f}" for a, b in zip(table[f"{m}_mean"], table[f"{m}_sd"])]
+                         for m in metrics}, index=table.index)
+
+
+def corrected_ttest(a, b, n_train: int, n_test: int) -> float:
+    """Two-sided p-value for 'models a and b score the same' over the same CV folds.
+
+    Nadeau & Bengio (2003) corrected resampled t-test: CV folds overlap, so the plain t-test is
+    over-confident; the variance is inflated by n_test / n_train.
+    """
+    d = np.asarray(a, float) - np.asarray(b, float)
+    k = len(d)
+    var = d.var(ddof=1)
+    if var == 0:
+        return 1.0 if d.mean() == 0 else 0.0
+    t = d.mean() / np.sqrt((1 / k + n_test / n_train) * var)
+    return float(2 * stats.t.sf(abs(t), df=k - 1))
+
+
+def fold_sizes(X) -> tuple[int, int]:
+    """(n_train, n_test) of one fold of make_cv() on X, for corrected_ttest."""
+    n_test = int(round(len(X) / cfg.CV_SPLITS))
+    return len(X) - n_test, n_test
+
+
+def select_model(table: pd.DataFrame, metric: str = "roc_auc", prefer: str = "Logistic Regression") -> str:
+    """Best mean `metric` wins, but `prefer` (the interpretable model) wins if within 1 SD of the best."""
+    best = table[f"{metric}_mean"].idxmax()
+    if prefer in table.index and table.loc[prefer, f"{metric}_mean"] >= (
+            table.loc[best, f"{metric}_mean"] - table.loc[best, f"{metric}_sd"]):
+        return prefer
+    return best
+
+
+def tune(name: str, X, y, n_iter: int = 30, use_fe: bool = False) -> RandomizedSearchCV:
+    """Random search over models.SEARCH_SPACES[name], scored by ROC-AUC on a 5x2 CV of the training set.
+
+    Uses different folds (seed + 1) from the 5x10 comparison CV, so tuning and reporting do not share splits.
+    """
+    search = RandomizedSearchCV(
+        models.zoo_pipeline(name, use_fe), models.SEARCH_SPACES[name], n_iter=n_iter, scoring="roc_auc",
+        cv=make_cv(n_repeats=2, seed=cfg.SEED + 1), random_state=cfg.SEED, n_jobs=cfg.N_JOBS, refit=True)
+    return search.fit(X, y)
+
+
+def calibrated(pipe, method: str = "sigmoid") -> CalibratedClassifierCV:
+    """Wrap a pipeline in Platt (sigmoid) calibration fitted with an inner 5-fold CV."""
+    return CalibratedClassifierCV(pipe, method=method, cv=5)
+
+
+def learning_curve_table(pipe, X, y, sizes=(0.2, 0.4, 0.6, 0.8, 1.0)) -> pd.DataFrame:
+    """ROC-AUC on training and validation folds as the training set grows."""
+    n, tr, va = learning_curve(pipe, X, y, train_sizes=list(sizes), cv=make_cv(n_repeats=4),
+                               scoring="roc_auc", n_jobs=cfg.N_JOBS, shuffle=True, random_state=cfg.SEED)
+    return pd.DataFrame({"train_size": n, "train_mean": tr.mean(1), "train_sd": tr.std(1),
+                         "valid_mean": va.mean(1), "valid_sd": va.std(1)})
+
+
+# ---------------------------------------------------------------- decision layer and final evaluation
+
+def oof_proba(pipe, X, y, n_repeats: int = cfg.CV_REPEATS) -> np.ndarray:
+    """Out-of-fold P(disease) for every training patient, averaged over `n_repeats` 5-fold splits.
+
+    Each prediction comes from a model that never saw that patient, so cut-offs chosen on these
+    probabilities are not tuned to the patients they are tested on.
+    """
+    runs = [cross_val_predict(pipe, X, y, method="predict_proba", n_jobs=cfg.N_JOBS,
+                              cv=StratifiedKFold(cfg.CV_SPLITS, shuffle=True, random_state=cfg.SEED + r))[:, 1]
+            for r in range(n_repeats)]
+    return np.mean(runs, axis=0)
+
+
+def _rates(y, flag) -> dict:
+    y, flag = np.asarray(y).astype(bool), np.asarray(flag).astype(bool)
+    tp, fp = (flag & y).sum(), (flag & ~y).sum()
+    fn, tn = (~flag & y).sum(), (~flag & ~y).sum()
+    div = lambda a, b: a / b if b else np.nan
+    return {"recall": div(tp, tp + fn), "specificity": div(tn, tn + fp),
+            "ppv": div(tp, tp + fp), "npv": div(tn, tn + fn), "tp": tp, "fp": fp, "fn": fn, "tn": tn}
+
+
+def threshold_sweep(y, p, thresholds) -> pd.DataFrame:
+    """Rates at each cut-off ("flag" = P(disease) >= cut-off), plus what it means per 100 patients."""
+    n, rows = len(y), []
+    for t in thresholds:
+        r = _rates(y, np.asarray(p) >= t)
+        rows.append({"threshold": t, "recall": r["recall"], "specificity": r["specificity"], "ppv": r["ppv"],
+                     "npv": r["npv"], "flagged_per_100": 100 * (r["tp"] + r["fp"]) / n,
+                     "caught_per_100": 100 * r["tp"] / n, "missed_per_100": 100 * r["fn"] / n})
+    return pd.DataFrame(rows)
+
+
+def net_benefit(y, p, thresholds) -> pd.DataFrame:
+    """Decision-curve analysis (Vickers & Elkin 2006): benefit of acting on the model at each risk cut-off,
+    against acting on everyone (treat all) or no one (treat none)."""
+    y, p, n = np.asarray(y), np.asarray(p), len(y)
+    prev = y.mean()
+    rows = []
+    for t in thresholds:
+        w = t / (1 - t)                                    # how many false alarms one true case is worth
+        flag = p >= t
+        rows.append({"threshold": t,
+                     "model": (flag & (y == 1)).sum() / n - (flag & (y == 0)).sum() / n * w,
+                     "treat_all": prev - (1 - prev) * w, "treat_none": 0.0})
+    return pd.DataFrame(rows)
+
+
+def curves(y, p, n_bins: int = 5) -> dict:
+    """ROC, precision-recall and calibration curves for plotting (plots.py cannot import sklearn)."""
+    fpr, tpr, _ = roc_curve(y, p)
+    prec, rec, _ = precision_recall_curve(y, p)
+    prob_true, prob_pred = calibration_curve(y, p, n_bins=n_bins, strategy="quantile")
+    return {"roc": (fpr, tpr, roc_auc_score(y, p)), "pr": (rec, prec, average_precision_score(y, p), float(np.mean(y))),
+            "calibration": (prob_pred, prob_true)}
+
+
+def confusion(y, flag) -> pd.DataFrame:
+    """2x2 table with the TRUE status as rows and the model's call as columns (fixes trap T11)."""
+    r = _rates(y, flag)
+    return pd.DataFrame([[r["tn"], r["fp"]], [r["fn"], r["tp"]]],
+                        index=["Truly no disease", "Truly disease"], columns=["Not flagged", "Flagged"])
+
+
+def _metrics(y, p, threshold) -> dict:
+    r = _rates(y, p >= threshold)
+    return {"roc_auc": roc_auc_score(y, p), "recall": r["recall"], "specificity": r["specificity"],
+            "ppv": r["ppv"], "npv": r["npv"], "brier": brier_score_loss(y, p)}
+
+
+def bootstrap_ci(y, p, threshold: float, n_boot: int = 1000, seed: int = cfg.SEED) -> pd.DataFrame:
+    """Point estimate and percentile 95% CI of each metric over patient-level bootstrap resamples."""
+    y, p = np.asarray(y), np.asarray(p)
+    rng = np.random.default_rng(seed)
+    draws = []
+    for _ in range(n_boot):
+        i = rng.integers(0, len(y), len(y))
+        if y[i].min() == y[i].max():                       # a one-class resample has no AUC; skip it
+            continue
+        draws.append(_metrics(y[i], p[i], threshold))
+    d = pd.DataFrame(draws)
+    point = _metrics(y, p, threshold)
+    return pd.DataFrame({"point": point, "lo": d.quantile(0.025), "hi": d.quantile(0.975)})
+
+
+def subgroup_recall(group, y, p, threshold: float) -> pd.DataFrame:
+    """Recall of the flag (P >= threshold) inside each subgroup, with the counts it rests on."""
+    df = pd.DataFrame({"group": np.asarray(group), "y": np.asarray(y), "flag": np.asarray(p) >= threshold})
+    sick = df[df["y"] == 1]
+    out = pd.DataFrame({"patients": df.groupby("group").size(),
+                        "with_disease": sick.groupby("group").size(),
+                        "caught": sick.groupby("group")["flag"].sum()}).fillna(0).astype(int)
+    out["recall"] = out["caught"] / out["with_disease"].replace(0, np.nan)
+    return out
+
+
+def exact_ci(successes: int, n: int) -> tuple[float, float]:
+    """Clopper-Pearson 95% interval for a proportion. Unlike a bootstrap it stays honest at 0 or n of n."""
+    ci = stats.binomtest(int(successes), int(n)).proportion_ci(confidence_level=0.95, method="exact")
+    return float(ci.low), float(ci.high)
+
+
+# ---------------------------------------------------------------- interpretation
+
+def permutation_table(pipe, X, y, n_repeats: int = 30) -> pd.Series:
+    """Drop in ROC-AUC when each clinical feature is shuffled (bigger = the model relies on it more)."""
+    from sklearn.inspection import permutation_importance
+    r = permutation_importance(pipe, X, y, scoring="roc_auc", n_repeats=n_repeats,
+                               random_state=cfg.SEED, n_jobs=cfg.N_JOBS)
+    s = pd.Series(r.importances_mean, index=X.columns)
+    return s.reindex(s.abs().sort_values(ascending=False).index)
+
+
+def coefficients(pipe) -> pd.Series:
+    """Logistic-regression coefficients on the standardised / one-hot inputs, largest magnitude first.
+
+    Numeric inputs are standardised, so a coefficient is the change in log-odds per 1 SD (fixes trap T10).
+    """
+    s = pd.Series(pipe[-1].coef_[0], index=pipe[:-1].get_feature_names_out())
+    return s.reindex(s.abs().sort_values(ascending=False).index)

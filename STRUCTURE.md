@@ -16,7 +16,7 @@ All the real code lives in one Python package, `cardiotriage/`, with one file pe
 |---|---|
 | **The notebook** | Tells the story (markdown) and calls package functions to produce the results and charts |
 | **`app.py`** | The live demo; loads the saved model and uses the same validation and triage code |
-| **`tests/smoke_test.py`** | Checks that the package works |
+| **`tests/test_*.py`** | Check that the package works (one file per module; `tests/smoke_test.py` runs them) |
 
 Because everyone imports the same functions, the demo cannot disagree with the model we trained.
 
@@ -28,17 +28,20 @@ heart-disease-prediction/
 │   ├── __init__.py                Empty on purpose (keeps the app's startup light)
 │   ├── config.py                  Constants only: paths, SEED, feature groups, code→label maps, recall target
 │   ├── data.py                    Load data, clean it, check it (the "data contract")
-│   ├── features.py         🔜     Domain features and the preprocessing step
-│   ├── models.py           🔜     The five models, their tuning ranges, and the full pipeline
-│   ├── evaluation.py       🔜     Cross-validation, metrics, significance test, thresholds, bootstrap CIs
-│   ├── triage.py           🔜     Risk → tier + action, and "why this patient scored high"
-│   └── plots.py            🔜     Every chart
+│   ├── features.py                Domain features and the preprocessing step
+│   ├── models.py                  The five models, their tuning ranges, and the full pipeline
+│   ├── evaluation.py              Split, cross-validation, metrics, significance test, tuning, thresholds, confidence intervals
+│   ├── triage.py                  Risk → tier + action, and "why this patient scored high"
+│   └── plots.py                   Every chart
 │
-├── heart_disease_pitch_gold_standard.ipynb   🔜  The story: markdown + short calls into the package
-├── app.py                          🔜  Streamlit demo
-├── tests/smoke_test.py             Quick checks across the package (grows with each task)
+├── heart_disease_pitch_gold_standard.ipynb   The story: markdown + short calls into the package (sections 0–16 done)
+├── app.py                          Streamlit demo (run: .venv/Scripts/streamlit run app.py)
+├── tests/smoke_test.py             Runner: runs every tests/test_*.py (or only the areas you name)
+├── tests/test_<area>.py            The checks, one file per area: data, imports, models, evaluation,
+│                                   triage, plots, notebook, app (shared fixtures in tests/helpers.py)
+├── tests/check_notebook.py         Checks the executed notebook: no errors/warnings, Insights only quote printed numbers
 ├── data/raw/                       The three input files (see below)
-├── artifacts/                      🔜  Trained model (.joblib) and metrics.json, created by the notebook
+├── artifacts/                      Trained model (.joblib) and metrics.json, written by the notebook's last section
 ├── requirements.txt                Pinned library versions (Python 3.11)
 ├── SPEC.md                         What we are building and why
 ├── STRUCTURE.md                    This file
@@ -64,15 +67,15 @@ Imports go one way only. A file may import the files to its left, never to its r
 
 ```
 config ◄── data
-config ◄── features ◄── models ◄── evaluation
+config ◄── features ◄── models ◄── evaluation   (evaluation also uses data)
 config ◄── plots
-config, data ◄── triage
+config ◄── triage
 ```
 
 Rules to keep this working:
 1. `config.py` imports nothing from the package.
 2. `features.py` imports only `config`. The saved model contains objects from this file, and the app has to load them, so it must stay light.
-3. `triage.py` imports only `config` and `data`.
+3. `triage.py` imports only `config` (it is allowed `data`, but does not need it).
 4. **`app.py` imports only `config`, `data` and `triage`.** It must never import `models`, `evaluation` or `plots`; the smoke test checks this.
 5. Keep `cardiotriage/__init__.py` empty.
 6. Write feature functions at module level in `features.py`. Do not use `lambda`, because the saved model would not load in the app.
@@ -110,7 +113,9 @@ py -3.11 -m venv .venv
 # build everything: runs the notebook top to bottom and writes artifacts/
 .venv/Scripts/jupyter nbconvert --to notebook --execute --inplace heart_disease_pitch_gold_standard.ipynb
 
-.venv/Scripts/python -m tests.smoke_test     # quick checks (run from the repo root)
+.venv/Scripts/python -m tests.check_notebook # is the executed notebook clean and honest?
+.venv/Scripts/python -m tests.smoke_test     # all quick checks (run from the repo root)
+.venv/Scripts/python -m tests.smoke_test triage data   # only tests/test_triage.py and tests/test_data.py
 .venv/Scripts/streamlit run app.py           # the demo
 ```
 
@@ -126,6 +131,8 @@ Put this in the first code cell so edits to a module show up without restarting:
 ```
 
 If something looks stale, restart the kernel and run all cells.
+
+**Expected console noise.** When you run the notebook with `jupyter nbconvert --execute` on Windows, the terminal prints many `KeyError ... joblib_memmapping_folder` tracebacks from `resource_tracker.py`, plus two Jupyter warnings (zmq event loop, kernel over TCP). They come from parallel workers inside Jupyter, never appear inside the notebook, and do not change any result. The real check is `python -m tests.check_notebook`, which must say "clean". If you want a silent console, set `N_JOBS = 1` in `cardiotriage/config.py` (the run gets slower).
 
 ## Team rules
 

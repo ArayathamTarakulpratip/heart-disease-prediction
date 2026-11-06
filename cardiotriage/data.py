@@ -25,9 +25,24 @@ def load_kaggle() -> pd.DataFrame:
     return pd.read_csv(cfg.KAGGLE)
 
 
+def dictionary() -> pd.DataFrame:
+    """Data dictionary for the 13 features: meaning, type, and the official UCI codes or valid range."""
+    rows = []
+    for col in cfg.FEATURES:
+        kind = next(k for k, cols in [("numeric", cfg.NUMERIC), ("ordinal", cfg.ORDINAL),
+                                      ("nominal", cfg.NOMINAL), ("binary", cfg.BINARY)] if col in cols)
+        codes = ("; ".join(f"{c} = {name}" for c, name in cfg.LABELS[col].items()) if col in cfg.LABELS
+                 else "valid range {}-{}".format(*cfg.RANGES[col]))
+        rows.append({"feature": col, "meaning": cfg.DESCRIPTIONS[col], "type": kind, "codes": codes})
+    return pd.DataFrame(rows).set_index("feature")
+
+
 def deduplicate(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop exact duplicate rows so one patient cannot sit in both train and test."""
-    return df.drop_duplicates().reset_index(drop=True)
+    """Drop exact duplicate rows so one patient cannot sit in both train and test.
+
+    Keeps the original row ids: the notebook refers to patients by UCI row number.
+    """
+    return df.drop_duplicates()
 
 
 def validate(df: pd.DataFrame) -> None:
@@ -63,11 +78,14 @@ def validate(df: pd.DataFrame) -> None:
 def kaggle_vs_uci() -> dict:
     """Prove the Kaggle copy is label-flipped and re-coded, by matching every row back to UCI.
 
-    Returns n_kaggle, n_matched, crosstabs (Kaggle value vs UCI value, per column) and mismatches
-    (rows where the documented mapping in cfg.KAGGLE_TO_UCI does not give the UCI value; all 0).
+    Returns n_kaggle, n_matched, crosstabs (Kaggle value vs UCI value, per column), mismatches
+    (rows where the documented mapping in cfg.KAGGLE_TO_UCI does not give the UCI value; all 0),
+    kaggle_duplicates (exact duplicate rows in Kaggle) and uci_unmatched (UCI patients Kaggle lost).
     """
     k, u = load_kaggle(), load_cleveland()
     m = k.merge(u, on=cfg.KAGGLE_MATCH_KEYS, suffixes=("_kaggle", "_uci"))
+    found = u.merge(k[cfg.KAGGLE_MATCH_KEYS].drop_duplicates(), on=cfg.KAGGLE_MATCH_KEYS,
+                    how="left", indicator=True)["_merge"].eq("both").to_numpy()
 
     crosstabs = {"target": pd.crosstab(m["target"], m[cfg.TARGET])}
     mismatches = {"target": int(((1 - m["target"]) != m[cfg.TARGET]).sum())}   # Kaggle target=1 means NO disease
@@ -76,4 +94,5 @@ def kaggle_vs_uci() -> dict:
         crosstabs[col] = pd.crosstab(kag, uci.fillna(-1))                         # -1 stands for '?'
         mapped = kag.map(mapping)
         mismatches[col] = int((~((mapped == uci) | (mapped.isna() & uci.isna()))).sum())
-    return {"n_kaggle": len(k), "n_matched": len(m), "crosstabs": crosstabs, "mismatches": mismatches}
+    return {"n_kaggle": len(k), "n_matched": len(m), "crosstabs": crosstabs, "mismatches": mismatches,
+            "kaggle_duplicates": int(k.duplicated().sum()), "uci_unmatched": u[~found]}

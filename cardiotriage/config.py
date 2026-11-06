@@ -13,6 +13,15 @@ MODEL_PATH = ARTIFACTS / "heart_disease_pipeline.joblib"
 # ---- reproducibility and targets ----
 SEED = 42
 RECALL_TARGET = 0.90                              # recall on the disease class (SPEC §0.5)
+PPV_TARGET = 0.85                                 # precision wanted in the "High" tier
+TIER_ACTIONS = {
+    "High": "Priority angiography",
+    "Medium": "Cardiology review or further testing",
+    "Low": "Routine follow-up with safety-netting advice",
+}
+TEST_SIZE = 0.20                                  # locked hold-out share, touched once at the end
+CV_SPLITS, CV_REPEATS = 5, 10                     # repeated stratified k-fold on the training set
+N_JOBS = -1                                       # parallel CV / search workers
 
 # ---- columns (UCI order); `num` is angiographic status 0-4, `disease` = num > 0 ----
 COLUMNS = ["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg",
@@ -32,6 +41,23 @@ RANGES = {
     "chol": (80, 700),         # serum cholesterol, mg/dl
     "thalach": (50, 250),      # max heart rate achieved, bpm
     "oldpeak": (0.0, 10.0),    # ST depression
+}
+
+# ---- what each feature measures (UCI documentation) ----
+DESCRIPTIONS = {
+    "age": "Age in years",
+    "sex": "Sex",
+    "cp": "Chest pain type",
+    "trestbps": "Resting blood pressure on admission (mm Hg)",
+    "chol": "Serum cholesterol (mg/dl)",
+    "fbs": "Fasting blood sugar > 120 mg/dl",
+    "restecg": "Resting ECG result",
+    "thalach": "Maximum heart rate achieved on the exercise test (bpm)",
+    "exang": "Angina induced by exercise",
+    "oldpeak": "ST depression induced by exercise relative to rest (mm)",
+    "slope": "Slope of the peak-exercise ST segment",
+    "ca": "Major vessels (0-3) coloured by fluoroscopy",
+    "thal": "Thallium stress-test result",
 }
 
 # ---- official UCI code meanings (also the allowed values for validate) ----

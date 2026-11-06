@@ -68,7 +68,7 @@ Things Assignment.md did weakly (do not copy these): duplicated code blocks (3.1
 | **T1** | **Target is inverted (PROVEN).** In this Kaggle CSV, `target=1` means **no disease** | All 303 rows matched to UCI on 6 numeric columns: `target=1` ↔ `num=0` for 165 rows, `target=0` ↔ `num>0` for 138 rows, with zero exceptions | Use UCI as the source with `disease = (num > 0)`; show the match crosstab in a QA cell. Every "insight" in the current notebook is backwards in clinical terms |
 | **T2** | **Every categorical code is re-mapped (PROVEN)** | Kaggle→UCI: `cp` 0→4 (asymptomatic), 1→2, 2→3, 3→1 (typical); `slope` 0→3 (down), 1→2, 2→1 (up); `thal` 1→6 (fixed), 2→3 (normal), 3→7 (reversible), 0→NaN; **`restecg` 0→2 (LVH), 1→0 (normal), 2→1 (ST-T)** | Use UCI codes with the official dictionary; print the mapping table as evidence |
 | T3 | Hidden missing values | `ca=4` (5 rows) and `thal=0` (2 rows) are invalid codes; UCI has `?` there | Set them to NaN and impute inside the pipeline |
-| T4 | Duplicate row | `df.duplicated().sum() == 1` | Drop it before splitting so the same patient can't sit in both train and test |
+| T4 | Duplicate row **(PROVEN: a Kaggle artefact)** | Kaggle has 1 exact duplicate (a healthy 38-year-old man) and is **missing UCI patient 184** (a 60-year-old woman with disease), which is why Kaggle counts are 165/138 vs UCI 164/139. UCI Cleveland itself has 0 duplicates | Use UCI; still run `deduplicate()` before splitting as a guard |
 | T5 | Test-set tuning | KNN `n_neighbors` was chosen by test score | Use CV only; the test set is used once at the end |
 | T6 | Wrong hyperparameters reused | `clf = LogisticRegression(C=4.89)` but `best_params_` gives C=0.204 | Use `best_estimator_` |
 | T7 | "CV" that includes the test set | `cross_val_score(clf, X, y)` uses all rows | Run CV on train only and report the test set separately |
@@ -119,13 +119,13 @@ Turn the course notebook into a pitch-ready proof of concept that scores full ma
 
 | Module | Responsibility | Imports from package |
 |---|---|---|
-| `config.py` | Constants only: paths, `SEED`, feature groups (`NUMERIC/ORDINAL/NOMINAL/BINARY`), UCI code→label maps, `RECALL_TARGET` | nothing |
-| `data.py` | `load_cleveland/hungarian/kaggle`, `?`→NaN, de-dupe, `disease = num>0`, `validate(df)` (the data contract; raises `ValueError`), `kaggle_vs_uci()` (T1/T2 proof) | `config` |
-| `features.py` | Domain-feature functions (module-level, picklable) and `build_preprocessor()` | `config` |
-| `models.py` | `MODEL_ZOO` (Dummy, LR, KNN, RF, XGBoost), `SEARCH_SPACES`, `build_pipeline(model, use_fe)` | `config`, `features` |
-| `evaluation.py` | `make_split`, `make_cv`, `cv_table`, `corrected_ttest`, `tune`, `learning_curve_table`, `threshold_sweep`, `net_benefit`, `bootstrap_ci` | `config`, `models` |
-| `triage.py` | Inference: `pick_thresholds`, `triage(p, thresholds)` → tier + action, `contributions(pipe, patient)` | `config`, `data` |
-| `plots.py` | Every chart (EDA and evaluation); the notebook only calls `plots.*` | `config` |
+| `config.py` | Constants only: paths, `SEED`, split/CV sizes, `N_JOBS`, feature groups (`NUMERIC/ORDINAL/NOMINAL/BINARY`), descriptions, UCI code→label maps, `RECALL_TARGET`, `PPV_TARGET`, `TIER_ACTIONS` | nothing |
+| `data.py` | `load_cleveland/hungarian/kaggle`, `?`→NaN, `deduplicate`, `disease = num>0`, `dictionary()`, `validate(df)` (the data contract; raises `ValueError`), `kaggle_vs_uci()` (T1–T4 proof) | `config` |
+| `features.py` | Domain-feature functions (module-level, picklable) and `build_preprocessor(use_fe, drop)`. Binary columns are imputed too (most frequent): Cleveland has no gaps there, but other hospitals such as Hungary do. | `config` |
+| `models.py` | `MODEL_ZOO` (Dummy, LR, KNN, RF, XGBoost), `SEARCH_SPACES`, `build_pipeline(model, use_fe, drop)`, `zoo_pipeline` | `config`, `features` |
+| `evaluation.py` | `make_split`, `make_cv`, `fold_sizes`, `metrics_at`, `cv_scores`, `cv_table`, `format_table`, `corrected_ttest`, `select_model`, `tune`, `calibrated`, `learning_curve_table`, `oof_proba`, `threshold_sweep`, `net_benefit`, `curves`, `confusion`, `bootstrap_ci`, `exact_ci`, `subgroup_recall`, `permutation_table`, `coefficients` | `config`, `data`, `models` |
+| `triage.py` | Inference: `pick_thresholds`, `triage(p, thresholds)` → tier + action, `baseline(pipe, X)`, `contributions(pipe, patient, baseline)` | `config` |
+| `plots.py` | Every chart (EDA and evaluation); takes precomputed data, never imports scikit-learn | `config` |
 
 `__init__.py` is empty, so `app.py` never loads `evaluation`, `models`, or `plots`. The smoke test enforces this.
 
@@ -137,8 +137,8 @@ Turn the course notebook into a pitch-ready proof of concept that scores full ma
 3. **Acquire and inspect:** assumptions list; load UCI Cleveland; **Kaggle-vs-UCI QA cell** proving T1/T2; official data dictionary.
 4. **Integrity QA and cleaning:** duplicates (T4), invalid codes and `?` → NaN (T3), `validate()`, range checks, class balance.
 5. **Focused EDA:** 5–6 blocks, each hypothesis → chart → **Insight** with a number, on the *corrected* target.
-6. **Domain feature engineering:** % of age-predicted max HR = `thalach / (220 − age)`; hypertension flag `trestbps ≥ 130` (ACC/AHA 2017); hypercholesterolaemia `chol ≥ 240`; `oldpeak > 1`. **CV ablation decides** whether they are kept, and the result is shown either way.
-7. **Split and validation design:** stratified 80/20 locked test set; `RepeatedStratifiedKFold(5×10)` on train; a toy confusion matrix to sanity-check the metrics (like the NDCG sanity check in Assignment.md).
+6. **Split and validation design:** stratified 80/20 locked test set; `RepeatedStratifiedKFold(5×10)` on train; a toy confusion matrix to sanity-check the metrics (like the NDCG sanity check in Assignment.md). *(Moved before feature engineering: the ablation needs the split and folds.)*
+7. **Domain feature engineering:** % of age-predicted max HR = `thalach / (220 − age)`; hypertension flag `trestbps ≥ 130` (ACC/AHA 2017); hypercholesterolaemia `chol ≥ 240`; `oldpeak > 1`. **CV ablation decides** whether they are kept, and the result is shown either way. *(Result: dropped — no significant gain.)*
 8. **Models:** Dummy → LR → KNN → RF → XGBoost on identical folds; one "how it works / why here" paragraph each; mean ± SD table + box plot; a **paired significance check** (corrected resampled t-test, Nadeau–Bengio) for the best vs the runner-up.
 9. **Tuning:** `RandomizedSearchCV` inside CV for every model; before/after table; **learning curve** (does more data help?); calibration (`CalibratedClassifierCV`) when a model's Brier score improves.
 10. **Decision layer:** threshold sweep from OOF predictions → per-100-patients table (flagged / caught / missed); **decision-curve analysis** (net benefit vs treat-all / treat-none); 3 triage tiers.
@@ -147,15 +147,15 @@ Turn the course notebook into a pitch-ready proof of concept that scores full ma
 13. **External validation (stretch):** train on Cleveland using the 10 features Hungary records reliably (drop `ca`, `thal`, `slope`); score `processed.hungarian.data` (n=294, a different hospital) and report the AUC/recall drop honestly. Switzerland and VA are not used (`chol` is coded 0 = missing, and >50% of the stress-test fields are missing).
 14. **Interpretation:** permutation importance + standardized LR coefficients; check them against cardiology knowledge.
 15. **Limitations** (T15–T17), **clinical/business impact**, **next steps**, and a short **model card** (intended use, out of scope, metrics, data, caveats).
-16. **Serialize** `{"pipeline", "thresholds", "features", "metrics", "versions"}` → `artifacts/heart_disease_pipeline.joblib` (+ `artifacts/metrics.json`).
+16. **Serialize** `{"pipeline", "thresholds", "baseline", "features", "metrics", "presets", "versions"}` → `artifacts/heart_disease_pipeline.joblib` (+ `artifacts/metrics.json`).
 
 Selection rule: the best CV ROC-AUC wins. **If LR is within 1 SD of the best, ship LR** (interpretable, exact per-patient contributions, well calibrated). If a tree model wins by more than 1 SD, add `shap` for its explanations (this is an ask-first dependency).
 
 ### `app.py` (Streamlit)
-Sidebar form with clinical labels and valid ranges; 4 **preset patients** from the test set (clear high-risk, clear low-risk, borderline, the missed patient); outputs are risk %, a colour-coded tier with its action, the top contributing factors (for LR these are the linear-model SHAP values, computed exactly without the library), a **what-if** comparison against the previous input, and a disclaimer. The model loads once via `st.cache_resource`; inputs go through `cardiotriage.data.validate()`; it imports only `config`, `data`, and `triage`. Out of scope: auth, a database, batch upload, deployment.
+Sidebar form with clinical labels and valid ranges; 4 **preset patients** stored in the artifact (clear high-risk, clear low-risk and borderline from the test set; "missed by the model" from the out-of-fold training predictions, because no test patient was missed); outputs are risk %, a colour-coded tier with its action, the top contributing factors (exact linear SHAP values `coef × (x − average training patient)`, computed without the `shap` library), a **what-if** comparison against the previous input, and a disclaimer. The model loads once via `st.cache_resource`; inputs go through `cardiotriage.data.validate()`; it imports only `config`, `data`, and `triage`. Out of scope: auth, a database, batch upload, deployment.
 
 ## 5. Tech stack
-Python 3.11 venv · pandas · numpy · scikit-learn · xgboost · matplotlib · seaborn · joblib · streamlit · jupyter + nbconvert. No SHAP unless the selection rule requires it. No imbalanced-learn (the classes are 54/46, so resampling is not justified; the notebook says so).
+Python 3.11 venv · pandas · numpy · scikit-learn · xgboost · matplotlib · seaborn · joblib · streamlit (+ altair, its charting library, used directly by `app.py`) · jupyter + nbconvert. No SHAP unless the selection rule requires it. No imbalanced-learn (the classes are 54/46, so resampling is not justified; the notebook says so).
 
 ## 6. Facts to cite (checked against sources on 2026-11-06)
 - **WHO CVD fact sheet (updated 31 Jul 2025):** about **19.8 M** CVD deaths in 2022, about 32% of global deaths; 85% of these are heart attack and stroke; about 80% occur in low- and middle-income countries. https://www.who.int/news-room/fact-sheets/detail/cardiovascular-diseases-(cvds)
@@ -168,6 +168,7 @@ Python 3.11 venv · pandas · numpy · scikit-learn · xgboost · matplotlib · 
 py -3.11 -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/jupyter nbconvert --to notebook --execute --inplace heart_disease_pitch_gold_standard.ipynb
+.venv/Scripts/python -m tests.check_notebook  # executed notebook is clean and its Insights quote printed numbers
 .venv/Scripts/python -m tests.smoke_test      # run from the repo root so `cardiotriage` imports
 .venv/Scripts/streamlit run app.py
 ```
@@ -179,7 +180,8 @@ cardiotriage/                       the package: all logic (see §4)
   config.py  data.py  features.py  models.py  evaluation.py  triage.py  plots.py
 heart_disease_pitch_gold_standard.ipynb   the single combiner: story + calls into cardiotriage
 app.py                              Streamlit demo (imports config, data, triage only)
-tests/smoke_test.py                 assert-based, no pytest dependency
+tests/test_<area>.py                assert-based checks, one file per area; no pytest dependency
+tests/smoke_test.py                 runner for all of them (`python -m tests.smoke_test [area ...]`)
 data/raw/processed.cleveland.data   UCI original (source of truth)
 data/raw/processed.hungarian.data   UCI, external validation
 data/raw/heart-disease.csv          Kaggle copy (QA evidence only)
@@ -211,7 +213,7 @@ Conventions: one responsibility per module; no cycles (§4 table); domain featur
 
 ## 10. Testing strategy
 - The notebook runs headless via nbconvert with **0 errors and 0 warnings**. Grep the outputs for `Warning`. Fix warnings at the cause; blanket `filterwarnings("ignore")` is not allowed.
-- `tests/smoke_test.py`: `validate()` accepts the clean data and rejects bad codes; the joblib loads in a fresh interpreter; the presets give probabilities in [0, 1] and the expected tiers; contributions sum to logit − intercept; importing `cardiotriage.triage` and reading `app.py` does not pull in `evaluation`, `models`, or `plots`.
+- `tests/smoke_test.py`: `validate()` accepts the clean data and rejects bad codes; the joblib loads in a fresh interpreter; the presets give probabilities in [0, 1] and the expected tiers; contributions sum to logit(patient) − logit(average training patient); importing `cardiotriage.triage` and reading `app.py` does not pull in `evaluation`, `models`, or `plots`.
 - Manual: `streamlit run app.py`, click every preset, try one invalid input.
 
 ## 11. Boundaries
@@ -224,8 +226,11 @@ Conventions: one responsibility per module; no cycles (§4 table); domain featur
 2. All of T1–T18 are addressed and each one is referenced in the notebook.
 3. Five model families are compared on identical repeated-CV folds (mean ± SD), plus a significance check.
 4. Recall ≥ 0.90 at the chosen threshold on OOF predictions; test recall is reported with a bootstrap 95% CI. If specificity falls below 0.60 at that point, document the trade-off in a decision-curve plot instead of hiding it.
+   **Status: met.** OOF recall 0.901 at specificity 0.679 (≥ 0.60). Test: 28 of 28 sick patients flagged; because a bootstrap CI collapses at 28/28, the exact Clopper–Pearson interval is reported instead (0.877–1.000), and the bootstrap is kept for the other metrics.
 5. Headless execution shows 0 errors and 0 warnings; the joblib file is produced.
+   **Status: met for notebook outputs** (`tests.check_notebook` clean). The `nbconvert` *console* also prints 81 joblib/loky `resource_tracker` tracebacks (Windows); they never reach a cell and do not affect results (see plan.md risks).
 6. `app.py` works with all presets; `tests/smoke_test.py` passes.
+   **Status: met.** Smoke test 58/58, including 5 Streamlit `AppTest` checks (every preset lands in its expected tier, the contract rejects age 10, what-if delta works, no deprecation notices, no training-code imports); also checked in a real browser.
 
 ## 13. Plan
 See `tasks/plan.md` and `tasks/todo.md`.

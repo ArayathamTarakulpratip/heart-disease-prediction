@@ -1,0 +1,50 @@
+{
+  "selected_model": "Logistic Regression",
+  "C": 0.21568228019263963,
+  "use_domain_features": false,
+  "thresholds": {
+    "low": 0.2873,
+    "high": 0.5093
+  },
+  "cv_roc_auc": {
+    "mean": 0.9002,
+    "sd": 0.0347
+  },
+  "test": {
+    "roc_auc": {
+      "point": 0.961,
+      "lo": 0.9019,
+      "hi": 0.9978
+    },
+    "recall": {
+      "point": 1.0,
+      "lo": 1.0,
+      "hi": 1.0
+    },
+    "specificity": {
+      "point": 0.6667,
+      "lo": 0.5,
+      "hi": 0.8286
+    },
+    "ppv": {
+      "point": 0.7179,
+      "lo": 0.5789,
+      "hi": 0.8537
+    },
+    "npv": {
+      "point": 1.0,
+      "lo": 1.0,
+      "hi": 1.0
+    },
+    "brier": {
+      "point": 0.0842,
+      "lo": 0.0492,
+      "hi": 0.1282
+    }
+  },
+  "test_recall_exact_ci": [
+    0.8766,
+    1.0
+  ],
+  "hungary_roc_auc_10_features": 0.8804
+}
