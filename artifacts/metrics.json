@@ -46,6 +46,12 @@
     0.8766,
     1.0
   ],
-  "no_imaging_cv_roc_auc": 0.8459,
-  "hungary_roc_auc_10_features": 0.8804
+  "no_imaging_cv_roc_auc": 0.8444,
+  "decision_cv": {
+    "recall": 0.9009,
+    "specificity": 0.542,
+    "high_ppv": 0.8571
+  },
+  "hungary_roc_auc_10_features": 0.8775,
+  "hungary_recall_10_features": 0.8868
 }

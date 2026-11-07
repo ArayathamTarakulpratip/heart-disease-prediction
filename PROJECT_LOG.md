@@ -279,3 +279,8 @@ Run all commands from the repo root.
 3. Improve recall for women: more data, a review of missed cases.
 4. Re-calibrate per hospital and monitor drift after deployment.
 5. Production path: records-system integration, a model service with a typed input contract (our `data.validate`), monitoring.
+
+
+## 2026-11-07: input timing and decision-rule correction
+
+The UCI file has no measurement timestamps. Because `ca` can come from fluoroscopy during the target procedure, the demo now leads with the reduced-input logistic model; `thal` is excluded for uncertain timing and `slope` for cross-hospital completeness. The full model remains a retrospective comparison. Low now requires clinician review and a documented follow-up date, responsible contact and urgent return instructions. The 13-feature queue and Medicare figures are labeled simulations with no observed waits, queue order or savings. The reduced-input model is tuned independently; outer folds repeat tuning and both cut-off selections before tier assessment. Hungary recall is below target. The live Streamlit comparison toggle and Low plan were checked in a browser. The user deferred video and presentation work.

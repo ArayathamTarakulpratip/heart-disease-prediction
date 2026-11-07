@@ -1,4 +1,6 @@
-# Evaluation: what is left to reach full marks
+# Historical evaluation audit (superseded)
+
+This 2026-11-06 audit predates the pre-angiography demo, separate-fold decision validation, and simulation labels. Use `README.md` and the executed notebook for current results. The user deferred the video deliverable.
 
 Audit of the repo against the 24-mark rubric (Problem Statement 12 + Implementation 12). Notebook cell numbers are **0-based** (cell 0 is the title cell of `heart_disease_pitch_gold_standard.ipynb`).
 

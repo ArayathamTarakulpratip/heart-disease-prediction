@@ -14,7 +14,7 @@ def test_saved_artifact_scores_presets_with_expected_tiers_in_fresh_process():
         "assert {'pipeline','thresholds','baseline','features','metrics','versions','presets','no_imaging'} <= set(a), set(a);"
         "bad = [];"
         "[bad.append(n) for n, pr in a['presets'].items()"
-        " if triage.triage(a['pipeline'].predict_proba(pd.DataFrame([pr['patient']])[cfg.FEATURES])[0, 1], a['thresholds'])['tier'] != pr['expected_tier']];"
+        " if triage.triage(a['no_imaging']['pipeline'].predict_proba(pd.DataFrame([pr['patient']])[cfg.FEATURES])[0, 1], a['no_imaging']['thresholds'])['tier'] != pr['expected_tier']];"
         "loaded = [m for m in sys.modules if m in ('cardiotriage.evaluation','cardiotriage.models','cardiotriage.plots')];"
         "print(len(a['presets']), bad, loaded); sys.exit(1 if bad or loaded or len(a['presets']) != 4 else 0)"
     )
@@ -52,17 +52,29 @@ def test_no_imaging_model_is_blind_to_imaging_features():
     assert a["pipeline"].predict_proba(patient)[0, 1] != a["pipeline"].predict_proba(blinded)[0, 1]
 
 
-def test_app_circularity_check_shows_the_no_imaging_risk():
+def test_app_comparison_toggle_shows_the_retrospective_risk():
     import joblib
     from cardiotriage import config as cfg
     pr = joblib.load(cfg.MODEL_PATH)["presets"]["Clear high risk"]
     at = _app().run()
     at.selectbox(key="preset").set_value("Clear high risk").run()
-    assert len(at.metric) == 1, "check must be off by default"
-    at.toggle(key="no_imaging").set_value(True).run()
+    assert len(at.metric) == 1, "comparison must be off by default"
+    at.toggle(key="full_model").set_value(True).run()
     assert not at.exception and len(at.metric) == 2, at.exception
-    assert at.metric[1].value == f"{pr['risk_no_imaging']:.1%}", (at.metric[1].value, pr["risk_no_imaging"])
+    assert at.metric[1].value == f"{pr['risk_full']:.1%}", (at.metric[1].value, pr["risk_full"])
     assert abs(at.session_state["last"]["risk"] - pr["risk"]) < 1e-3, "the main risk must not change"
+
+
+def test_main_score_ignores_retrospective_only_inputs_and_low_has_safety_plan():
+    at = _app().run()
+    at.selectbox(key="preset").set_value("Clear low risk").run()
+    before = at.metric[0].value
+    assert any("follow-up date" in e.value for e in at.info), [e.value for e in at.info]
+    assert not any(w.key in {"ca", "thal", "slope"} for w in at.selectbox)
+    at.toggle(key="full_model").set_value(True).run()
+    at.selectbox(key="ca").set_value(3).run()
+    assert at.metric[0].value == before
+    assert not at.exception and len(at.metric) == 2
 
 
 def test_app_rejects_a_value_outside_the_data_contract():

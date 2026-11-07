@@ -17,7 +17,7 @@ PPV_TARGET = 0.85                                 # precision wanted in the "Hig
 TIER_ACTIONS = {
     "High": "Priority angiography",
     "Medium": "Cardiology review or further testing",
-    "Low": "Routine follow-up with safety-netting advice",
+    "Low": "Clinician review and a documented safety-net plan",
 }
 TEST_SIZE = 0.20                                  # locked hold-out share, touched once at the end
 CV_SPLITS, CV_REPEATS = 5, 10                     # repeated stratified k-fold on the training set

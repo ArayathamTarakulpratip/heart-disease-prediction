@@ -131,13 +131,13 @@ def decision_curve(nb: pd.DataFrame):
 
 
 def queue_gain(gain: pd.DataFrame):
-    """Cumulative share of sick patients served as the angiography queue fills: risk order vs arrival order."""
+    """Simulated disease capture by risk order against a proportional-arrival benchmark."""
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.plot(100 * gain["slots"], 100 * gain["model"], color=PALETTE["Disease"], lw=2, label="queue ordered by model risk")
-    ax.plot(100 * gain["slots"], 100 * gain["first_come_first_served"], color="grey", ls="--",
-            label="first come, first served")
-    ax.set(title="Who gets the first angiography slots? (out-of-fold)", xlabel="Share of queue served (%)",
-           ylabel="Share of all sick patients served (%)", xlim=(0, 100), ylim=(0, 102))
+    ax.plot(100 * gain["slots"], 100 * gain["proportional_benchmark"], color="grey", ls="--",
+            label="proportional benchmark (hypothetical)")
+    ax.set(title="Simulated early-slot disease capture (out-of-fold)", xlabel="Share of slots (%)",
+           ylabel="Share of all patients with disease (%)", xlim=(0, 100), ylim=(0, 102))
     ax.legend(fontsize=8, loc="lower right")
     fig.tight_layout()
     return fig

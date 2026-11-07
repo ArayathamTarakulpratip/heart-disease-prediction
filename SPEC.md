@@ -1,6 +1,6 @@
 # Spec: Heart Disease Triage — Pitch-Grade Upgrade
 
-Status: **v3 — 2026-11-06: rubric-audit follow-up (Phases 5–9: sources, math, clinical-cut-off comparison, nested CV, queue impact, README, DEMO) added. Scope: implementation and fixes only.** The pitch deck, script, team roles, and the Tier-1/Tier-2 model presentation are out of scope.
+Status: **v4 — 2026-11-07: pre-angiography input timing, Low-tier safety, simulated impact labels, and separate-fold decision-rule validation.** The video and presentation are deferred at the user’s request.
 Sources read: `end-to-end-heart-disease-classification (1).ipynb` (87 cells, all outputs), `../Assignment.md`,
 `heart-disease.csv` (profiled from `C:\Users\USER\OneDrive\Desktop\ml-course\proj11\`), and the UCI originals
 (`processed.{cleveland,hungarian,switzerland,va}.data`).
@@ -108,9 +108,9 @@ Things Assignment.md did weakly (do not copy these): duplicated code blocks (3.1
 
 Turn the course notebook into a pitch-ready proof of concept that scores full marks on every rubric line.
 
-- **User:** a cardiologist or chest-pain-unit physician who has the initial work-up results (history, ECG, stress test, imaging) and must decide who goes first in the confirmatory angiography queue.
-- **Prediction:** P(angiographic coronary disease, >50% narrowing) from the 13 work-up attributes.
-- **Action:** High risk → priority angiography. Medium → cardiology review or further testing. Low → routine follow-up with safety-netting.
+- **User:** a cardiologist or chest-pain-unit physician with history, ECG and recorded exercise-test measures, deciding priority before confirmatory angiography. `ca` and `thal` timing is unverified; the main demo excludes them.
+- **Prediction:** P(angiographic coronary disease, >50% narrowing) from the 10 retained inputs. The 13-feature model is a retrospective comparison.
+- **Action:** High risk → priority angiography. Medium → cardiology review or further testing. Low → clinician review and a documented safety-net plan before any deferral.
 - **Primary metric:** Recall (sensitivity) on the disease class, because a missed case can mean a missed MI. Constraints: specificity, ROC-AUC, and Brier score.
 
 ## 4. Scope
@@ -141,7 +141,7 @@ Turn the course notebook into a pitch-ready proof of concept that scores full ma
 7. **Domain feature engineering:** % of age-predicted max HR = `thalach / (220 − age)`; hypertension flag `trestbps ≥ 130` (ACC/AHA 2017); hypercholesterolaemia `chol ≥ 240`; `oldpeak > 1`. **CV ablation decides** whether they are kept, and the result is shown either way. *(Result: dropped — no significant gain.)*
 8. **Models:** Dummy → LR → KNN → RF → XGBoost on identical folds; one "how it works / why here" paragraph each; mean ± SD table + box plot; a **paired significance check** (corrected resampled t-test, Nadeau–Bengio) for the best vs the runner-up.
 9. **Tuning:** `RandomizedSearchCV` inside CV for every model; before/after table; calibration (`CalibratedClassifierCV`) when a model's Brier score improves; **9.2** every tuned model at its own recall-0.90 cut-off (specificity, PPV, PR-AUC, confusion grid, miss overlap); **9.3** nested CV for the selected model and the runner-up; **9.4 learning curve** (does more data help?); **9.5** drop-column feature selection with a one-step backward elimination (keep all 13 unless the smaller model wins with p < 0.05); **9.6** search-budget check (30 vs 100 settings for the selected model and the runner-up).
-10. **Decision layer:** threshold sweep from OOF predictions → per-100-patients table (flagged / caught / missed); **decision-curve analysis** (net benefit vs treat-all / treat-none); 3 triage tiers; **10.3** queue gain vs first come, first served, and the tiers per 1,000 referred patients.
+10. **Decision layer:** threshold sweep from OOF predictions → per-100-patients table (flagged / caught / missed); **decision-curve analysis** (net benefit vs treat-all / treat-none); 3 triage tiers; **10.3** simulated queue gain versus a proportional-arrival benchmark and retrospective-model tiers per 1,000 referred patients; no queue or wait outcomes are recorded.
 11. **Final test evaluation (run once):** ROC and PR curves, confusion matrix at the threshold, recall/specificity/PPV/NPV with **bootstrap 95% CIs**, calibration curve.
 12. **Clinical safety:** false-negative table; 3 per-patient case studies (true positive, missed patient, borderline) with per-feature contributions; recall by sex and age band.
 13. **External validation (stretch):** train on Cleveland using the 10 features Hungary records reliably (drop `ca`, `thal`, `slope`); score `processed.hungarian.data` (n=294, a different hospital) and report the AUC/recall drop honestly. Switzerland and VA are not used (`chol` is coded 0 = missing, and >50% of the stress-test fields are missing).
