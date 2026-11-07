@@ -149,8 +149,8 @@ with left:
                 f"{cfg.DESCRIPTIONS[c]} (`{c}`): {label(c, previous['inputs'][c])} → {label(c, patient.iloc[0][c])}"
                 for c in changed))
     if patient.iloc[0]["sex"] == 0:
-        st.info("The 13-feature analysis caught a smaller share of sick women than sick men. "
-                "The pre-angiography model needs its own subgroup assessment; review Low results carefully.")
+        st.info("The main model's sex subgroup estimates are based on small historical groups. "
+                "Review Low results carefully; notebook Section 13.3 reports counts and uncertainty.")
 
 with right:
     st.subheader("Why this risk?")

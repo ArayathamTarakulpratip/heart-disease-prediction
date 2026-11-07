@@ -33,9 +33,9 @@ A Low result does not clear the patient. Before deferral, a clinician reviews sy
 | Queue simulation (retrospective 13-feature risks) | First 40% of hypothetical risk-ordered slots contain 76.6% of sick patients, versus 40% under a proportional-arrival benchmark. No actual queue order or waiting time was observed. |
 | Payment simulation (13-feature tiers, US Medicare 2026) | If Low patients received no angiography, the estimated payment difference would be $1,368,518 per 1,000 referred. This assumes 45.5 patients with disease per 1,000 would not undergo angiography; it is not a measured saving or a recommendation to deny testing. |
 | Retrospective feature and search checks | dropping a single feature other than `ca` made no significant difference; a smaller full-model variant was not reliably better (+0.007, p = 0.47). These checks do not select the main reduced-input feature set. |
-| Known gaps | Hungary recall for the main model was 0.887, below target. The retrospective model had lower out-of-fold recall for women (0.778) than men (0.925); the main model needs its own subgroup check. |
+| Known gaps | Hungary recall for the main model was 0.887, below target. For the main model, Cleveland out-of-fold recall was 15/18 for women (0.833; exact interval 0.586–0.964) and 85/93 for men (0.914; 0.838–0.962). The cut-off was selected on these patients; prospective subgroup validation is needed. |
 
-Model figures are read from [`artifacts/metrics.json`](artifacts/metrics.json); the separate-fold decision check is in notebook Section 13. The payment and queue simulations in Sections 10 and 15 use the retrospective model.
+Model figures are read from [`artifacts/metrics.json`](artifacts/metrics.json); the separate-fold decision check is in notebook Section 13. The payment and queue simulations in Sections 10 and 15 use the retrospective model. The main model card and sex subgroup counts are in Sections 15.5 and 13.3.
 
 ## Run it
 
