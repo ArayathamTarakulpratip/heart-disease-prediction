@@ -184,6 +184,18 @@ def test_nested_cv_gives_one_unbiased_score_per_outer_fold_and_is_deterministic(
     assert np.array_equal(a, b)
 
 
+def test_nested_decision_cv_selects_thresholds_on_separate_folds():
+    from cardiotriage import data, evaluation
+    X, _, y, _ = evaluation.make_split(data.load_cleveland())
+    folds = evaluation.nested_decision_cv("Logistic Regression", X, y,
+                                          drop=["ca", "thal", "slope"], n_iter=2)
+    assert len(folds) == 5 and folds["test_patients"].sum() == len(y)
+    assert folds["test_disease"].sum() == y.sum()
+    assert (folds["low"] <= folds["high"]).all()
+    assert (folds["disease_in_low"] <= folds["test_disease"]).all()
+    assert (folds["disease_in_high"] <= folds["high_patients"]).all()
+
+
 def test_queue_gain_matches_a_hand_computed_queue():
     from cardiotriage import evaluation
     # 6 patients, 3 sick; the model ranks them 0 > 1 > 2 > 3 > 4 > 5
@@ -192,7 +204,7 @@ def test_queue_gain_matches_a_hand_computed_queue():
     g = evaluation.queue_gain(y, p, [1 / 3, 0.5, 1.0]).set_index("slots")
     # first 2 slots: patients 0, 1 -> 1 of 3 sick; first 3: 0, 1, 2 -> 2 of 3; all 6 -> 3 of 3
     assert np.allclose(g["model"], [1 / 3, 2 / 3, 1.0]), g
-    assert np.allclose(g["first_come_first_served"], [1 / 3, 0.5, 1.0])
+    assert np.allclose(g["proportional_benchmark"], [1 / 3, 0.5, 1.0])
 
 
 def test_queue_gain_of_a_perfect_ranker_serves_every_sick_patient_first():

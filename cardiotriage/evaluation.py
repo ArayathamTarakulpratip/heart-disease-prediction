@@ -103,18 +103,19 @@ def select_model(table: pd.DataFrame, metric: str = "roc_auc", prefer: str = "Lo
     return best
 
 
-def _search(name: str, n_iter: int, use_fe: bool) -> RandomizedSearchCV:
+def _search(name: str, n_iter: int, use_fe: bool, drop=()) -> RandomizedSearchCV:
     return RandomizedSearchCV(
-        models.zoo_pipeline(name, use_fe), models.SEARCH_SPACES[name], n_iter=n_iter, scoring="roc_auc",
+        models.build_pipeline(models.MODEL_ZOO[name], use_fe, drop=drop), models.SEARCH_SPACES[name],
+        n_iter=n_iter, scoring="roc_auc",
         cv=make_cv(n_repeats=2, seed=cfg.SEED + 1), random_state=cfg.SEED, n_jobs=cfg.N_JOBS, refit=True)
 
 
-def tune(name: str, X, y, n_iter: int = 30, use_fe: bool = False) -> RandomizedSearchCV:
+def tune(name: str, X, y, n_iter: int = 30, use_fe: bool = False, drop=()) -> RandomizedSearchCV:
     """Random search over models.SEARCH_SPACES[name], scored by ROC-AUC on a 5x2 CV of the training set.
 
     Uses different folds (seed + 1) from the 5x10 comparison CV, so tuning and reporting do not share splits.
     """
-    return _search(name, n_iter, use_fe).fit(X, y)
+    return _search(name, n_iter, use_fe, drop=drop).fit(X, y)
 
 
 def nested_cv(name: str, X, y, n_iter: int = 30, use_fe: bool = False) -> np.ndarray:
@@ -142,13 +143,44 @@ def learning_curve_table(pipe, X, y, sizes=(0.2, 0.4, 0.6, 0.8, 1.0)) -> pd.Data
 def oof_proba(pipe, X, y, n_repeats: int = cfg.CV_REPEATS) -> np.ndarray:
     """Out-of-fold P(disease) for every training patient, averaged over `n_repeats` 5-fold splits.
 
-    Each prediction comes from a model that never saw that patient, so cut-offs chosen on these
-    probabilities are not tuned to the patients they are tested on.
+    Each prediction comes from a model that never saw that patient. Selecting and evaluating
+    cut-offs on this same set of predictions is still optimistic; use nested_decision_cv for
+    an independent assessment of the complete decision rule.
     """
     runs = [cross_val_predict(pipe, X, y, method="predict_proba", n_jobs=cfg.N_JOBS,
                               cv=StratifiedKFold(cfg.CV_SPLITS, shuffle=True, random_state=cfg.SEED + r))[:, 1]
             for r in range(n_repeats)]
     return np.mean(runs, axis=0)
+
+
+def nested_decision_cv(name: str, X, y, *, drop=(), n_iter: int = 10) -> pd.DataFrame:
+    """Assess tuning, threshold selection and tier assignment on separate outer folds.
+
+    Each outer training fold tunes C, obtains inner out-of-fold probabilities to set both
+    cut-offs, then scores patients in the untouched outer fold. The held-out test set is
+    excluded. This estimates the rule as implemented, conditional on choosing LR beforehand.
+    """
+    outer = StratifiedKFold(cfg.CV_SPLITS, shuffle=True, random_state=cfg.SEED + 3)
+    rows = []
+    for fold, (tr, te) in enumerate(outer.split(X, y), 1):
+        X_tr, X_te = X.iloc[tr], X.iloc[te]
+        y_tr, y_te = y.iloc[tr], y.iloc[te]
+        search = _search(name, n_iter, use_fe=False, drop=drop).fit(X_tr, y_tr)
+        pipe = search.best_estimator_
+        inner_p = oof_proba(pipe, X_tr, y_tr, n_repeats=1)
+        cuts = triage.pick_thresholds(y_tr, inner_p)
+        pipe.fit(X_tr, y_tr)
+        p = pipe.predict_proba(X_te)[:, 1]
+        rates = _rates(y_te, p >= cuts["low"])
+        high_flag = p >= cuts["high"]
+        rows.append({"fold": fold, "low": cuts["low"], "high": cuts["high"],
+                     "recall": rates["recall"], "specificity": rates["specificity"],
+                     "ppv": rates["ppv"], "low_patients": int((p < cuts["low"]).sum()),
+                     "disease_in_low": int(((p < cuts["low"]) & (y_te.to_numpy() == 1)).sum()),
+                     "high_patients": int(high_flag.sum()),
+                     "disease_in_high": int((high_flag & (y_te.to_numpy() == 1)).sum()),
+                     "test_patients": len(te), "test_disease": int(y_te.sum())})
+    return pd.DataFrame(rows).set_index("fold")
 
 
 def operating_points(pipes: dict, X, y) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -205,12 +237,15 @@ def net_benefit(y, p, thresholds) -> pd.DataFrame:
 
 
 def queue_gain(y, p, fractions) -> pd.DataFrame:
-    """Share of all sick patients served within the first `slots` share of the angiography queue when the
-    queue is ordered by risk (model), against first-come-first-served, which serves them in proportion."""
+    """Simulate disease share in early risk-ordered slots against a proportional benchmark.
+
+    The data contain neither arrival order nor waiting times. The benchmark assumes disease
+    is spread evenly through an imagined arrival sequence; it is not an observed queue.
+    """
     y = np.asarray(y)
-    order = np.argsort(-np.asarray(p, float), kind="stable")    # highest risk first; ties keep arrival order
+    order = np.argsort(-np.asarray(p, float), kind="stable")    # highest risk first; ties keep input order
     served = np.cumsum(y[order]) / y.sum()
-    rows = [{"slots": f, "model": served[max(round(f * len(y)), 1) - 1], "first_come_first_served": f}
+    rows = [{"slots": f, "model": served[max(round(f * len(y)), 1) - 1], "proportional_benchmark": f}
             for f in fractions]
     return pd.DataFrame(rows)
 

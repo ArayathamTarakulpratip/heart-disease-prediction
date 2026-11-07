@@ -1,4 +1,4 @@
-"""Heart Disease Triage: live demo of the angiography-queue triage model.
+"""Heart Disease Triage: pre-angiography demo using the reduced-input model.
 
 Run from the repo root:  .venv/Scripts/streamlit run app.py
 
@@ -24,8 +24,8 @@ TIER_STYLE = {"High": ("#E45756", "🔴"), "Medium": ("#F2A541", "🟠"), "Low":
 SECTIONS = {
     "Patient": ["age", "sex", "trestbps", "chol", "fbs"],
     "Symptoms and resting ECG": ["cp", "restecg"],
-    "Exercise stress test": ["thalach", "exang", "oldpeak", "slope"],
-    "Imaging": ["ca", "thal"],
+    "Exercise stress test": ["thalach", "exang", "oldpeak"],
+    "Retrospective comparison inputs (not used by the main score)": ["slope", "ca", "thal"],
 }
 
 
@@ -59,7 +59,13 @@ if not cfg.MODEL_PATH.exists():
     st.error(f"Model file not found: {cfg.MODEL_PATH}. Run the notebook to the end first; its last section saves it.")
     st.stop()
 artifact = load_artifact()
-presets, thresholds = artifact["presets"], artifact["thresholds"]
+if "no_imaging" not in artifact or "baseline" not in artifact["no_imaging"]:
+    st.error("The saved model predates the pre-angiography demo. Re-run the notebook to rebuild artifacts.")
+    st.stop()
+presets = artifact["presets"]
+main = artifact["no_imaging"]
+thresholds = main["thresholds"]
+active_features = [c for c in cfg.FEATURES if c not in main["dropped"]]
 
 if "preset" not in st.session_state:                       # first visit: start from the first preset
     st.session_state["preset"] = next(iter(presets))
@@ -83,9 +89,10 @@ with st.sidebar:
 
 # ---------------------------------------------------------------- main: risk, tier, explanation
 st.title("Heart Disease Triage")
-st.caption("Prioritising the confirmatory angiography queue after the initial cardiac work-up.")
+st.caption("Pre-angiography prioritisation using 10 recorded features. The score excludes `ca`, `thal` and `slope`.")
 st.warning("**Decision support, not diagnosis.** A proof of concept trained on 1980s UCI Cleveland data; "
-           "the clinician makes the decision.", icon="⚠️")
+           "the clinician makes the decision. Suspected acute coronary syndrome needs urgent assessment "
+           "regardless of this score.", icon="⚠️")
 
 patient = pd.DataFrame([{col: (np.nan if st.session_state[col] is None else float(st.session_state[col]))
                          for col in cfg.FEATURES}])
@@ -95,13 +102,13 @@ except ValueError as err:
     st.error(f"This patient cannot be scored: {err}")
     st.stop()
 
-pipe = artifact["pipeline"]
+pipe = main["pipeline"]
 risk = float(pipe.predict_proba(patient[cfg.FEATURES])[0, 1])
 result = triage.triage(risk, thresholds)
-contrib = triage.contributions(pipe, patient[cfg.FEATURES], artifact["baseline"])
+contrib = triage.contributions(pipe, patient[cfg.FEATURES], main["baseline"])
 
 last = st.session_state.get("last")
-if last is not None and not pd.Series(last["inputs"]).equals(patient.iloc[0]):   # NaN-safe compare
+if last is not None and not pd.Series(last["inputs"])[active_features].equals(patient.iloc[0][active_features]):
     st.session_state["previous"] = last          # only a real change of inputs moves the "vs previous" reference
 previous = st.session_state.get("previous")
 st.session_state["last"] = {"risk": risk, "tier": result["tier"], "inputs": patient.iloc[0].to_dict()}
@@ -115,21 +122,24 @@ with left:
                 f"font-size:1.3rem'>{icon} <b>{result['tier']} tier</b><br>{result['action']}</div>",
                 unsafe_allow_html=True)
     st.caption(f"Tiers: Low below {thresholds['low']:.1%} · Medium from {thresholds['low']:.1%} · "
-               f"High from {thresholds['high']:.1%}. The low cut-off was set to catch at least "
-               f"{cfg.RECALL_TARGET:.0%} of sick patients in validation.")
-    if st.toggle("Circularity check: also score without imaging", key="no_imaging",
-                 help="Re-scores this patient with a model that never sees `ca`, `thal` or `slope` "
-                      "(notebook Section 13), to show the main model is not just reading the imaging."):
-        check = artifact["no_imaging"]
-        risk_no_imaging = float(check["pipeline"].predict_proba(patient[cfg.FEATURES])[0, 1])
-        tier_no_imaging = triage.triage(risk_no_imaging, check["thresholds"])["tier"]
-        st.metric("Risk without imaging (no `ca`, `thal`, `slope`)", f"{risk_no_imaging:.1%}",
-                  delta=f"{100 * (risk_no_imaging - risk):+.1f} pts vs full model", delta_color="off")
-        st.caption(f"{tier_no_imaging} tier on its own cut-offs. Cross-validated ROC-AUC "
-                   f"{artifact['metrics']['no_imaging_cv_roc_auc']:.3f} without imaging vs "
-                   f"{artifact['metrics']['cv_roc_auc']['mean']:.3f} with it: most of the signal is there before imaging.")
+               f"High from {thresholds['high']:.1%}. These cut-offs target {cfg.RECALL_TARGET:.0%} recall "
+               "on training predictions; outer-fold validation assesses the full rule separately.")
+    if result["tier"] == "Low":
+        st.info("**Low safety-net:** A clinician must review symptoms and tests before any deferral, "
+                "record a follow-up date and who will contact the patient, and give clear instructions "
+                "to seek urgent assessment for new or worsening chest pain or other concerning symptoms. "
+                "A Low score does not rule out disease.")
+    if st.toggle("Compare with 13-feature retrospective model", key="full_model",
+                 help="The comparison uses `ca`, which may be obtained during the angiogram being prioritised. "
+                      "It must not determine pre-angiography priority."):
+        full_risk = float(artifact["pipeline"].predict_proba(patient[cfg.FEATURES])[0, 1])
+        full_tier = triage.triage(full_risk, artifact["thresholds"])["tier"]
+        st.metric("Retrospective 13-feature risk", f"{full_risk:.1%}",
+                  delta=f"{100 * (full_risk - risk):+.1f} pts vs pre-angiography model", delta_color="off")
+        st.caption(f"{full_tier} tier on separate cut-offs. This comparison uses fluoroscopy (`ca`), "
+                   "thallium imaging (`thal`) and stress ECG slope, so it is not the queue decision.")
     if previous is not None:
-        changed = [c for c in cfg.FEATURES
+        changed = [c for c in active_features
                    if label(c, previous["inputs"][c]) != label(c, patient.iloc[0][c])]
         if len(changed) > 4:
             st.markdown(f"**A different patient:** {len(changed)} inputs changed since the previous result.")
@@ -138,8 +148,8 @@ with left:
                 f"{cfg.DESCRIPTIONS[c]} (`{c}`): {label(c, previous['inputs'][c])} → {label(c, patient.iloc[0][c])}"
                 for c in changed))
     if patient.iloc[0]["sex"] == 0:
-        st.info("In validation the model caught a smaller share of sick women than of sick men. "
-                "Treat a Low result for a woman with extra caution.")
+        st.info("The 13-feature analysis caught a smaller share of sick women than sick men. "
+                "The pre-angiography model needs its own subgroup assessment; review Low results carefully.")
 
 with right:
     st.subheader("Why this risk?")
@@ -167,11 +177,14 @@ with right:
 with st.expander("About this model"):
     m = artifact["metrics"]
     st.markdown(
-        f"- **Model:** {m['selected_model']} (C = {m['C']:.3f}) on the 13 UCI clinical features\n"
-        f"- **Cross-validated ROC-AUC:** {m['cv_roc_auc']['mean']:.3f} ± {m['cv_roc_auc']['sd']:.3f}\n"
-        f"- **Held-out test set:** ROC-AUC {m['test']['roc_auc']['point']:.3f}; recall "
-        f"{m['test']['recall']['point']:.3f} (exact 95% CI {m['test_recall_exact_ci'][0]:.3f} to "
-        f"{m['test_recall_exact_ci'][1]:.3f}); specificity {m['test']['specificity']['point']:.3f}\n"
+        f"- **Main model:** logistic regression on 10 recorded features; Cleveland cross-validated ROC-AUC "
+        f"{m['no_imaging_cv_roc_auc']:.3f}; Hungary external ROC-AUC {m['hungary_roc_auc_10_features']:.3f} "
+        f"and recall {m['hungary_recall_10_features']:.3f}, below the {cfg.RECALL_TARGET:.0%} target\n"
+        f"- **Retrospective 13-feature model:** ROC-AUC {m['cv_roc_auc']['mean']:.3f} ± "
+        f"{m['cv_roc_auc']['sd']:.3f}; its held-out test results do not describe the main model\n"
+        f"- **Decision rule:** outer-fold recall {m['decision_cv']['recall']:.3f}, specificity "
+        f"{m['decision_cv']['specificity']:.3f}, High-tier PPV {m['decision_cv']['high_ppv']:.3f}; "
+        f"estimates remain uncertain in this small cohort\n"
         f"- **Explanations:** exact per-feature contributions for a linear model (SHAP values), relative to "
         f"the average training patient\n"
         f"- **Not for:** first-contact screening, the general population, or decisions without a clinician\n"
