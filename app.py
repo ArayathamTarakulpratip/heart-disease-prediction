@@ -76,7 +76,10 @@ with st.sidebar:
     st.header("Inputs")
     st.selectbox("Load a demo patient", list(presets), key="preset", on_change=load_preset)
     st.caption(presets[st.session_state["preset"]]["description"] + ". Edit any value below to explore what-ifs.")
+    st.toggle("Compare with 13-feature retrospective model", key="full_model")
     for section, cols in SECTIONS.items():
+        if section.startswith("Retrospective") and not st.session_state["full_model"]:
+            continue
         st.subheader(section)
         for col in cols:
             if col in cfg.LABELS:
@@ -129,9 +132,7 @@ with left:
                 "record a follow-up date and who will contact the patient, and give clear instructions "
                 "to seek urgent assessment for new or worsening chest pain or other concerning symptoms. "
                 "A Low score does not rule out disease.")
-    if st.toggle("Compare with 13-feature retrospective model", key="full_model",
-                 help="The comparison uses `ca`, which may be obtained during the angiogram being prioritised. "
-                      "It must not determine pre-angiography priority."):
+    if st.session_state["full_model"]:
         full_risk = float(artifact["pipeline"].predict_proba(patient[cfg.FEATURES])[0, 1])
         full_tier = triage.triage(full_risk, artifact["thresholds"])["tier"]
         st.metric("Retrospective 13-feature risk", f"{full_risk:.1%}",

@@ -2,7 +2,7 @@
 
 These figures come from the rebuilt artifact and a live Streamlit run on 2026-11-07. Recheck them after retraining. Presets 1–3 are from the 61-patient Cleveland test set; preset 4 is a diseased **training** patient selected because reduced-input out-of-fold scoring placed them Low. Its displayed score comes from the final fitted model, which has seen that patient.
 
-**Start:** `.venv/Scripts/streamlit run app.py` from the repo root. The first preset opens automatically. Main-model cut-offs: Low below **26.3%**, Medium from **26.3%**, High from **66.2%**. The main model excludes `ca`, `thal` and `slope`. `ca` may be measured during the target angiogram, so the 13-feature score is only a retrospective comparison. `slope` is exercise ECG, excluded for cross-hospital completeness.
+**Start:** `.venv/Scripts/streamlit run app.py` from the repo root. The first preset opens automatically. Main-model cut-offs: Low below **26.3%**, Medium from **26.3%**, High from **66.2%**. The main form asks for only ten inputs. Opening the retrospective comparison reveals `ca`, `thal` and `slope`; the main score excludes them. `ca` may be measured during the target angiogram, so the 13-feature score is only a retrospective comparison. `slope` is exercise ECG, excluded for cross-hospital completeness.
 
 | Step | Do this | Expected live result | What to say |
 |---|---|---|---|

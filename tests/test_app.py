@@ -70,9 +70,10 @@ def test_main_score_ignores_retrospective_only_inputs_and_low_has_safety_plan():
     at.selectbox(key="preset").set_value("Clear low risk").run()
     before = at.metric[0].value
     assert any("follow-up date" in e.value for e in at.info), [e.value for e in at.info]
+    assert not any(w.key in {"ca", "thal", "slope"} for w in at.selectbox)
+    at.toggle(key="full_model").set_value(True).run()
     at.selectbox(key="ca").set_value(3).run()
     assert at.metric[0].value == before
-    at.toggle(key="full_model").set_value(True).run()
     assert not at.exception and len(at.metric) == 2
 
 
