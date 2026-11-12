@@ -7,7 +7,7 @@ Everything needed to record the 10–15 minute pitch video with 6 presenters. Re
 | [`PLAN.md`](PLAN.md) | The proposed approach, a comparison of the five drafted plans, the defects they share, and the finalised decisions with reasons | everyone, first |
 | [`SLIDES.md`](SLIDES.md) | Deck spec: 31 slides, content and numbers per slide, plus the global layout, colour, type and chart rules | whoever builds the deck |
 | [`SCRIPT.md`](SCRIPT.md) | The 13:00 script, segment by segment, with timings, hand-off lines and hold times | all 6 speakers |
-| [`DEMO_RUNSHEET.md`](DEMO_RUNSHEET.md) | The 2:30 live demo, step by step, with the live figures and a failure playbook | the demo presenter |
+| [`DEMO_RUNSHEET.md`](DEMO_RUNSHEET.md) | The 1:35 live demo, step by step, with the live figures and a failure playbook | the demo presenter |
 | [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md) | End-to-end account of the project: data, QA, EDA, split design, models, tuning, evaluation, impact, limitations | everyone, for individual questioning |
 | [`ML_CONCEPTS.md`](ML_CONCEPTS.md) | The AI/ML theory behind every choice, each paired with the number it produced here | everyone |
 | [`QA_BANK.md`](QA_BANK.md) | ~50 likely questions with short answers, including the ten that can actually hurt | everyone |

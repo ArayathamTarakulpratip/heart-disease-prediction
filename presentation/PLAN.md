@@ -95,7 +95,7 @@ Take the drafts' **timing discipline and slide rules**, my **spine**, and fix th
 | Decision | Choice | Why |
 |---|---|---|
 | Runtime | **13:00**, hard stop 13:30 | 2 min of safety under the cap; all drafts agree |
-| Speakers | **6**, every one on camera, 1:50–2:30 each | Matches the team; contribution is 10% of the mark |
+| Speakers | **6**, every one on camera, exactly 2:10 each | Matches the team; contribution is 10% of the mark |
 | Hook | **The audit**: patient 184 + inverted labels, with the crosstab on screen | Unique to us; any team can quote WHO figures, no other team has an audit |
 | Problem numbers | Ontario 1.4%, Patel 37.6% obstructive yield, England 148,882 waiting ≥18 weeks, Thailand 23.4→26.9/100,000 | Recent first, mechanism second (fixes `EVALUATION.md` Gap 1) |
 | Headline model | **10-feature pre-angiography model** | The only one that is usable before the procedure; it is what the app ships |
