@@ -29,7 +29,7 @@ Speaker **M6**, whose 2:10 block is this 1:35 demo plus the 0:35 close. Screen c
 | 1:12–1:35 | 6 | Preset **Missed by the model**, then **Age** = **10** | **5.5% Low** plus women caution; age 10 → contract error, **no score** | "A real miss: disease, scored Low. Hungary recall was 0.887, and recall for women 0.833, so the app says so. And age ten: the contract refuses to score it." |
 
 **Hand back:** "Decision support, not diagnosis — and suspected acute coronary syndrome goes on the urgent pathway
-whatever this screen says." → slide 29 (the close).
+whatever this screen says." → slide 16 (conclusion).
 
 ---
 

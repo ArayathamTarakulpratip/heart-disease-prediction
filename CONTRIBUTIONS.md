@@ -11,12 +11,12 @@ Replace `M1`–`M6` with real names before recording, and keep the row order the
 
 | # | Member | Owns (area + files / notebook sections) | Presents | Slides | On camera (2:10 each) |
 |---|---|---|---|---|---|
-| M1 | *name* | **Data provenance and problem evidence** — `cardiotriage/data.py`, §0 (all statistics, sources, years), §3.2; the Kaggle label-inversion proof | Hook + why it matters | 1–8 | 0:00–2:10 |
-| M2 | *name* | **Objective, data contract, QA** — `config.py`, §1, §3, §4 | Objective, data, contract, balance | 9–12 | 2:10–4:20 |
-| M3 | *name* | **EDA and the input-timing pivot** — `plots.py`, `features.py`, §5.1–5.9, §7 | EDA and the `ca` decision | 13–17 | 4:20–6:30 |
-| M4 | *name* | **Modelling and the decision layer** — `models.py`, `triage.py`, §6, §8, §9.1–9.2, §10 | Five families, comparison, tuning, tiers | 18–23 | 6:30–8:40 |
-| M5 | *name* | **Evaluation, validation, improvement** — `evaluation.py`, §9.3–9.6, §11–§14, §15 | Impact, validation, improvement, limits | 24–28 | 8:40–10:50 |
-| M6 | *name* | **App, demo and artifacts** — `app.py`, `artifacts/`, `DEMO.md` | Live demo (1:35) + close (0:35) | app, 29–31 | 10:50–13:00 |
+| M1 | *name* | **Problem and dataset** — §0, §1, §3, `data.py` | Problem, objective, dataset | 1–3 | 0:00–2:10 |
+| M2 | *name* | **Data quality and EDA** — §4, §5.1–5.7, `plots.py`, `config.py` | Data checks and 4 EDA findings | 4–6 | 2:10–4:20 |
+| M3 | *name* | **Input timing, validation, models** — §5.8–5.9, §6–§8, `models.py`, `features.py` | The `ca` decision, split design, five models | 7–9 | 4:20–6:30 |
+| M4 | *name* | **Comparison, tuning, results** — §9.1–9.2, §10, §11, §13, `triage.py` | Comparison, tuning, results | 10–12 | 6:30–8:40 |
+| M5 | *name* | **Improvement and limitations** — §9.3–9.6, §12, §14, §15, `evaluation.py` | Improvement, limitations | 13–14 | 8:40–10:50 |
+| M6 | *name* | **App and demo** — `app.py`, `artifacts/`, `DEMO.md` | Live demo (1:35) + conclusion | 15–17 | 10:50–13:00 |
 
 ## Shared responsibilities
 

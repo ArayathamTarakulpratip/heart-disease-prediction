@@ -1,3 +1,22 @@
+# REVISION 2 (supersedes §4 and §5 below)
+
+After review the approach changed in three ways. Sections 1–3 (comparison of the drafts and the stale-numbers defect)
+still stand; sections 4–5 are replaced by this.
+
+1. **Fewer slides: 31 → 17.** Five statistic slides became one problem slide; EDA, comparison and tuning each merged.
+2. **A standard ML-project talk, not a business case.** Order follows the rubric: problem → data → EDA → models →
+   results → improvement → demo → conclusion. Dropped: Thailand, WHO and England statistics, Medicare prices, the
+   simulated queue gain and payment figures.
+3. **No dataset-comparison story.** The Kaggle-versus-UCI audit and "patient 184" hook are removed from the deck and
+   script. The deck uses only the original UCI Cleveland data (plus Budapest as one external check). The audit remains
+   in the notebook and `PROJECT_BRIEF.md`, in case a lecturer asks.
+
+Kept: the 10-feature shipped model (not the 13-feature one), recall 0.901 / external 0.877 as headline numbers,
+**equal speaker time (6 × 2:10)**, the safety-net / "decision support, not diagnosis" framing, and the live demo.
+See [`SLIDES.md`](SLIDES.md) and [`SCRIPT.md`](SCRIPT.md).
+
+---
+
 # Presentation plan: comparison of the drafts, and the finalised approach
 
 Audience: pitch-competition judges. Deliverable: one YouTube video, 10–15 min at 1x, demo included, 6 presenters.
