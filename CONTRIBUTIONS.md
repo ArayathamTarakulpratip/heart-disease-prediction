@@ -9,25 +9,25 @@ what that member says on camera. Code-authorship history is in `git log` and is 
 Replace `M1`–`M6` with real names before recording, and keep the row order the same as the running order in
 [`presentation/SCRIPT.md`](presentation/SCRIPT.md).
 
-| # | Member | Owns (area + files / notebook sections) | Presents | Slides | On camera |
+| # | Member | Owns (area + files / notebook sections) | Presents | Slides | On camera (2:10 each) |
 |---|---|---|---|---|---|
-| M1 | *name* | **Data provenance and the audit** — `cardiotriage/data.py`, §3, §3.2, §4.1–4.3; the Kaggle label-inversion proof and patient 184 | Hook + Close | 1–3, 29–31 | 0:00–1:10, 12:20–13:00 |
-| M2 | *name* | **Problem and objective** — §0 (all three evidence layers and their sources), §1; every statistic, source and year | Why it matters, objective, error costs | 4–9 | 1:10–3:00 |
-| M3 | *name* | **Data contract, QA, metrics and improvement** — `config.py`, `evaluation.py` (metrics, CIs, nested CV, learning curve), §4, §6.1, §9.3–9.6, §12.2 | Data + QA + metric, then improvement and limitations | 10–12, 26–28 | 3:00–4:40, 11:30–12:20 |
-| M4 | *name* | **EDA and the input-timing pivot** — `plots.py`, `features.py`, §5.1–5.9, §7 | EDA (4 findings) and the circularity decision | 13–17 | 4:40–6:40 |
-| M5 | *name* | **Modelling, tuning and the decision layer** — `models.py`, `triage.py`, §6, §8, §9, §10 | Five families, comparison, tuning, tiers | 18–23 | 6:40–8:50 |
-| M6 | *name* | **Validation, impact and the demo** — `app.py`, `artifacts/`, `DEMO.md`, §11, §13, §14, §15.2 | Simulated impact, test + external validation, **live demo** | 24–25 + app | 8:50–11:30 |
+| M1 | *name* | **Data provenance and problem evidence** — `cardiotriage/data.py`, §0 (all statistics, sources, years), §3.2; the Kaggle label-inversion proof | Hook + why it matters | 1–8 | 0:00–2:10 |
+| M2 | *name* | **Objective, data contract, QA** — `config.py`, §1, §3, §4 | Objective, data, contract, balance | 9–12 | 2:10–4:20 |
+| M3 | *name* | **EDA and the input-timing pivot** — `plots.py`, `features.py`, §5.1–5.9, §7 | EDA and the `ca` decision | 13–17 | 4:20–6:30 |
+| M4 | *name* | **Modelling and the decision layer** — `models.py`, `triage.py`, §6, §8, §9.1–9.2, §10 | Five families, comparison, tuning, tiers | 18–23 | 6:30–8:40 |
+| M5 | *name* | **Evaluation, validation, improvement** — `evaluation.py`, §9.3–9.6, §11–§14, §15 | Impact, validation, improvement, limits | 24–28 | 8:40–10:50 |
+| M6 | *name* | **App, demo and artifacts** — `app.py`, `artifacts/`, `DEMO.md` | Live demo (1:35) + close (0:35) | app, 29–31 | 10:50–13:00 |
 
 ## Shared responsibilities
 
 | Task | Owner | Backup |
 |---|---|---|
-| Re-run the notebook end to end and confirm `tests.check_notebook` prints `clean` | M3 | M5 |
+| Re-run the notebook end to end and confirm `tests.check_notebook` prints `clean` | M5 | M4 |
 | Re-verify the six demo figures against the rebuilt artifact | M6 | M4 |
-| Export all slide figures from the rebuilt notebook | M4 | M6 |
+| Export all slide figures from the rebuilt notebook | M3 | M6 |
 | Build the deck to [`presentation/SLIDES.md`](presentation/SLIDES.md) | M2 | M1 |
 | Record, edit, upload | M6 | M1 |
-| Timekeeping in rehearsal (13:00 target, 13:30 hard stop) | M1 | M3 |
+| Timekeeping in rehearsal (13:00 target, 13:30 hard stop) | M1 | M2 |
 | Record the backup demo take | M6 | M5 |
 
 ## Question routing

@@ -1,7 +1,7 @@
 # Deck spec: 31 slides
 
 **Count:** 31 — 1 title, 29 content, 1 credits. The live demo runs on screen capture with **no slide behind it**.
-**Budget:** 13:00 total − 2:30 demo = 10:30 of slides ÷ 29 ≈ **22 s per slide**. Most are a single number and take 10–15 s;
+**Budget:** 13:00 total − 1:35 demo = 11:25 of slides ÷ 29 ≈ **24 s per slide**. Most are a single number and take 10–15 s;
 the five chart slides take 35–45 s. [`SCRIPT.md`](SCRIPT.md) gives the hold time for each. If a slide needs more than
 45 s, split it. If you must cut, drop slides 7, 21 and 26 in that order — nothing else is load-bearing.
 **Every figure below already exists** in `heart_disease_pitch_gold_standard.ipynb`; export it, do not redraw it.
@@ -75,36 +75,43 @@ with every other bar in `rule`-grey. Minimum 22 pt effective text — check by v
 
 ## Part B — slide-by-slide
 
+**Speaker time — equal by design (6 × 2:10 = 13:00)**
+
+| Speaker | Slides | Time | Slide-hold seconds |
+|---|---|---|---|
+| M1 | 1–8 | 0:00–2:10 | 130 |
+| M2 | 9–12 | 2:10–4:20 | 130 |
+| M3 | 13–17 | 4:20–6:30 | 130 |
+| M4 | 18–23 | 6:30–8:40 | 130 |
+| M5 | 24–28 | 8:40–10:50 | 130 |
+| M6 | demo + 29–31 | 10:50–13:00 | 95 demo + 35 close = 130 |
+
+
 Times are cumulative and match [`SCRIPT.md`](SCRIPT.md). "§" refers to notebook sections.
 
-### M1 — Hook (0:00–1:10)
+### M1 — Hook + why it matters (0:00–2:10) · slides 1–8
 
-| # | Title (the claim) | Visual | Content / numbers |
+| # | Title | Visual | Content / numbers |
 |---|---|---|---|
 | 1 | **Heart Disease Triage — prioritising the angiography queue** | Title only. Project name, 6 names, course, date | No subtitle longer than 9 words. Hold 4 s. |
 | 2 | Patient 184 is a 60-year-old woman with heart disease. The most popular copy of this dataset lost her. | Hero: **184**, with the one-row table beneath (age 60, female, asymptomatic, `num`=1) | She is replaced by a duplicate of a healthy patient. §3.2 |
 | 3 | And every label in that copy is inverted. | The 2×2 crosstab, large, with the two zero cells greyed and the two filled cells in `accent` | Kaggle `target`=0 ↔ UCI disease=1 (138); `target`=1 ↔ UCI no disease (165). 303/303 rows matched. §3.2 |
-
-### M2 — Why it matters + objective (1:10–3:00)
-
-| # | Title | Visual | Content / numbers |
-|---|---|---|---|
 | 4 | Cardiovascular disease kills about 19.8 million people a year. | Hero: **19.8M**, `muted` sub-line "≈32% of all deaths" | WHO CVD fact sheet, 2022 data, updated 31 Jul 2025. §0 Layer 1 |
 | 5 | The queue is where ranking pays off: 1 in 70 patients has a major event before their test. | Hero: **1.4%**, sub-line "109 of 8,030 died, had a heart attack or developed heart failure while waiting" | Natarajan, *CMAJ* 2002. Second line, 22 pt: England, 148,882 waiting ≥18 weeks, Sept 2025 (BHF/NHS England). §0 Layer 2 |
 | 6 | And most of those tests find nothing to treat. | Hero: **37.6%**, sub-line "of 398,978 elective angiograms found obstructive disease" | Patel, *NEJM* 2010. Footer adds the unit price: $3,312 per angiogram, CMS CY2026 OPPS, CPT 93458. **Say only this one 37.6%.** |
 | 7 | In Thailand the same pressure is rising. | Two numbers side by side: **23.4 → 26.9** per 100,000 (`accent`) and **72** PCI hospitals ≈ 1 per million (`ink`) | Sakboonyarat & Rangsin, *BMC Res Notes* 2024; Thai PCI Registry 2018–19. §0 Layer 3 |
 | 8 | The two errors are not equal, so recall is the metric. | 2-row table, FN row in `accent` | FN = sick patient deferred → **severe**, the error we minimise. FP = healthy patient takes a slot → moderate, accepted. Accuracy is misleading: "always say no disease" already scores 54.1%. §1, §4.4 |
-| 9 | Our objective, in one sentence. | The decision-flow diagram, full width | *From 10 results a clinician already has, estimate P(>50% narrowing in ≥1 major vessel) and place the patient in a tier, flagging ≥90% of those who truly have disease.* `10 inputs → data contract → model → risk % → tier → action`. §1 |
 
-### M3 — Data, QA, metric (3:00–4:40)
+### M2 — Objective, data, contract, balance (2:10–4:20) · slides 9–12
 
 | # | Title | Visual | Content / numbers |
 |---|---|---|---|
+| 9 | Our objective, in one sentence. | The decision-flow diagram, full width | *From 10 results a clinician already has, estimate P(>50% narrowing in ≥1 major vessel) and place the patient in a tier, flagging ≥90% of those who truly have disease.* `10 inputs → data contract → model → risk % → tier → action`. §1 |
 | 10 | UCI Cleveland: 303 patients, 13 features, one angiographic label. | Hero: **303 × 13**; beside it the simplified dictionary (8 rows, grouped: 5 numeric / 1 ordinal / 4 nominal / 3 binary) | Target `disease` = `num > 0`. Janosi et al. 1989, doi:10.24432/C52P4X. §3, §3.1 |
 | 11 | Before any analysis: a data contract every patient must pass. | Split slide — left: the valid-range table (age 18–100, BP 60–260, chol 80–700, HR 50–250, ST 0.0–10.0); right: the rejection message for the Kaggle file in `accent` | 303/303 UCI patients pass. 6 missing cells of 3,939 (`ca` 4, `thal` 2), 0 duplicates. Kaggle rejected: `cp` 143 invalid codes, `thal` 186, `slope` 21, `ca` 5. §4.1–4.3 |
 | 12 | The classes are nearly balanced, so accuracy hides everything. | `class_balance` chart | 139 of 303 (45.9%) with disease. Baseline "always no disease": 54.1% accuracy, **0% recall**. §4.4 |
 
-### M4 — EDA + the pivot (4:40–6:40)
+### M3 — EDA + the input-timing pivot (4:20–6:30) · slides 13–17
 
 | # | Title | Visual | Content / numbers |
 |---|---|---|---|
@@ -114,7 +121,7 @@ Times are cumulative and match [`SCRIPT.md`](SCRIPT.md). "§" refers to notebook
 | 16 | The strongest signal of all is the imaging — and that is the problem. | `rate_by(df, ["ca","thal"])` with a `accent` arrow on the `ca` gradient | `ca`: 0 vessels 26.1% → 3 vessels 85.0%. Highest correlation with disease, 0.46. §5.5, §5.6 |
 | 17 | `ca` may be measured **during** the angiogram we are trying to schedule. So we deleted it. | Two-column comparison table, the kept column in `ok` | Retrospective 13-feature: CV ROC-AUC **0.900**, cannot be externally validated (Hungary is 99% missing `ca`). Main 10-feature (no `ca`, `thal`, `slope`): CV ROC-AUC **0.844**, Hungary ROC-AUC **0.877**. We paid 0.056 for a model that can run before the procedure. §5.9, §13 |
 
-### M5 — Models, tuning, decision layer (6:40–8:50)
+### M4 — Models, comparison, tuning, tiers (6:30–8:40) · slides 18–23
 
 | # | Title | Visual | Content / numbers |
 |---|---|---|---|
@@ -125,31 +132,24 @@ Times are cumulative and match [`SCRIPT.md`](SCRIPT.md). "§" refers to notebook
 | 22 | Judge models where the decision is made: at 90% recall. | `confusion_grid`, 4 panels, LR panel outlined in `accent` | All four forced to recall 0.901. Specificity: LR 0.679, XGBoost 0.672, KNN 0.603, RF 0.565. Healthy patients correctly spared, of 131: 89 / 88 / 79 / 74. §9.2 |
 | 23 | A probability is not a decision. Three tiers are. | Tier table + the `threshold_tradeoff` curve | Main model: Low below **26.3%**, High from **66.2%**. Separate-fold check (cut-offs re-chosen inside each fold): recall **0.901**, specificity 0.542, High-tier PPV **0.857**. Low tier is never a discharge — it requires clinician review, a follow-up date and a named contact. §10, §13.2 |
 
-### M6 — Impact, validation, live demo (8:50–11:30)
+### M5 — Impact, validation, improvement, limits (8:40–10:50) · slides 24–28
 
 | # | Title | Visual | Content / numbers |
 |---|---|---|---|
 | 24 | Simulated: risk order puts 76.6% of sick patients in the first 40% of slots. | `queue_gain` curve, benchmark line dashed | vs 40% for proportional arrival. Per 1,000 referred (simulated, retrospective model): 360 sick in High, 368 healthy kept out of the priority queue, **45.5 sick left in Low**. The word **SIMULATED** sits top-right: the data has no arrival order, no waiting time, no withheld test. §10.3, §15.2 |
 | 25 | The locked test set, opened once — and a hospital the model never saw. | Confusion matrix left, Hungary metrics right | Retrospective 13-feature test: **28 of 28** sick patients flagged, exact 95% CI 0.877–1.000; ROC-AUC 0.961; specificity 0.667. Reduced-input secondary check: 28/28, ROC-AUC 0.957. Hungary, 294 patients, no refitting: ROC-AUC **0.877**, recall 0.887 — **below our 0.90 target**. §11, §13 |
-| — | **LIVE DEMO** | Screen capture only, no slide | 6 steps, [`DEMO_RUNSHEET.md`](DEMO_RUNSHEET.md) |
-
-### M3 (second slot) — Improvement (11:30–12:20)
-
-| # | Title | Visual | Content / numbers |
-|---|---|---|---|
 | 26 | Is the tuned score flattering itself? No. | 3-row table | Nested CV (tuning repeated inside 5 outer folds): LR 0.909 vs tuned 0.900 → optimism **−0.008**; XGBoost 0.905 vs 0.897. A 100-setting search added 0.000 to LR and 0.003 to XGBoost. §9.3, §9.6 |
 | 27 | More data would help. A different algorithm would not. | `learning_curve`, still rising at the right edge | Validation ROC-AUC 0.861 → 0.900 from 38 to 193 patients, still climbing. Drop-column test: only `ca` matters (−0.030, p=0.016); a 7-feature variant was +0.007, p=0.47 → keep all. **6 sick patients are missed by all four tuned models** — they need new inputs (troponin, symptom duration, calcium score), not a new algorithm. §9.4, §9.5, §9.2 |
 | 28 | What we would not yet trust. | 4 lines, the sex gap in `accent` | Recall for women **0.833** (15/18, CI 0.586–0.964) vs men 0.914 — the cut-off was chosen on these patients. One hospital, 1980s, patients already referred, 303 in total. Hungary recall 0.887, below target. Input timing unverified. §15.1, §13.3 |
 
-### M1 (close) — 12:20–13:00
+### M6 — Live demo (1:35) then close (0:35) (10:50–13:00) · slides 29–31
 
 | # | Title | Visual | Content / numbers |
 |---|---|---|---|
+| — | **LIVE DEMO** | Screen capture only, no slide | 6 steps, [`DEMO_RUNSHEET.md`](DEMO_RUNSHEET.md) |
 | 29 | Three numbers. | Three hero numbers in a row | **9 in 10** patients with disease flagged (separate-fold recall 0.901) · **368 per 1,000** healthy patients kept out of the priority queue (simulated) · **0.877** ROC-AUC at a hospital it had never seen |
 | 30 | Decision support, not diagnosis. | The sentence, 60 pt, centred, nothing else | Then cut to credits |
 | 31 | Credits | The contribution matrix from [`../CONTRIBUTIONS.md`](../CONTRIBUTIONS.md), 6 rows | Name · owned · presented. Hold 6 s. |
-
-> Footer numbering runs `n / 31`. Slides 1 and 31 are title and credits; 2–30 are the 29 content slides.
 
 ---
 
