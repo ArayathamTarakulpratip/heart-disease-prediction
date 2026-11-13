@@ -66,10 +66,10 @@ with a median blood pressure of 130 in both.
 We therefore removed it, together with the thallium scan and the ST slope. Cross-validated ROC-AUC fell from **0.900
 to 0.844**, and we accepted that. The model we ship uses the **ten features** available before the procedure.
 
-**[Slide 8, 35 s]** Our validation pipeline. We check the data, keep the ten features, and lock away a stratified
-20 percent, 61 patients. On the other 242, every model runs through the same **fifty folds**, and inside each fold
-imputation, scaling and encoding are fitted on the training part only, so nothing leaks. Then we tune, select, set the
-cut-offs from out-of-fold risks, check the second hospital, and open the test set **once**.
+**[Slide 8, 35 s]** Here is our pipeline. Raw data, then we validate it and split off 61 patients as a locked test
+set. The other 242 go through imputation, scaling and encoding, and model training, and the dark steps are refitted
+inside each of **fifty** cross-validation folds, so nothing leaks from validation data. The test patients are opened
+**once**, at the very end.
 
 **[Slide 9, 45 s]** We compare five models. A **dummy** model predicts the base rate; it is our floor. **Logistic
 regression** is a weighted sum passed through a sigmoid. **KNN** votes among the most similar patients. A **random
