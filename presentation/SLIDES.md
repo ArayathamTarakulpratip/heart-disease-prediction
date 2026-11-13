@@ -54,7 +54,7 @@ Every figure already exists in `heart_disease_pitch_gold_standard.ipynb` or `art
 | # | Title | Visual | Content |
 |---|---|---|---|
 | 7 | Dropping `ca`, `thal` and `slope` | Left: two-row table 13 vs 10 features (CV ROC-AUC 0.900 vs 0.844). Right: 3 bullets | • `ca` is a fluoroscopy finding that may be read during the very angiogram we are scheduling · • UCI has no timestamps, so we cannot prove it is available earlier · • The shipped model uses the **10 features** available beforehand |
-| 8 | Split and validation design | Diagram: 242 train / 61 locked test; 5-fold × 10 repeats | • Stratified 80/20 split; test set opened **once** · • **50** cross-validation folds, identical for every model · • All preprocessing inside the pipeline, so nothing leaks |
+| 8 | Validation pipeline | Three bands: data steps (raw → contract → 10 features → split 242/61); a red-outlined box *inside each of the 50 folds* (impute → scale + encode → model); then tune → select → cut-offs → Budapest check → test once (61) | One footer line: preprocessing is refitted on each training fold, so nothing leaks |
 | 9 | Five models | 5-row table: model · idea in one line · role | Dummy (floor) · Logistic regression (weighted sum + sigmoid) · KNN (vote of nearest patients) · Random forest (averaged trees, bagging) · XGBoost (trees correcting errors, boosting). Footer: no deep learning with 303 rows |
 
 ### M4 — Comparison, tuning, results

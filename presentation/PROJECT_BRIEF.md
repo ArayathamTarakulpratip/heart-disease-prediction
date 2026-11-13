@@ -293,7 +293,7 @@ raw 13 columns
   → [optional domain features]            # disabled: ablation showed no gain
   → ColumnTransformer:
        numeric   : median impute  → StandardScaler
-       ordinal   : median impute  (ca kept as a number — 0<1<2<3 is meaningful)
+       ordinal   : median impute → StandardScaler (ca stays one numeric column, in the numeric group)
        nominal   : most-frequent impute → OneHotEncoder
        binary    : most-frequent impute
   → model

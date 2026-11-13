@@ -107,7 +107,7 @@ what the column *means* clinically. Cost of fixing it: ROC-AUC 0.900 → 0.844.
 | **Most-frequent imputation** | nominal, binary | A category has no mean |
 | **StandardScaler** (z-score: (x − μ)/σ) | numeric | KNN measures Euclidean/Manhattan distance, so cholesterol in the hundreds would dominate ST depression in single digits. L2-regularised LR penalises coefficients, which is only fair if features share a scale. **Trees don't care** — but one pipeline for all five models keeps the comparison fair |
 | **One-hot encoding** | `cp`, `restecg`, `slope`, `thal` | Their integers are *labels*, not quantities: `cp`=4 (asymptomatic) is not "twice" `cp`=2. Leaving them numeric imposes a false ordering (trap T9) |
-| **`ca` left as a number** | ordinal | 0 < 1 < 2 < 3 vessels **is** a genuine ordering, and the disease rate rises monotonically (26.1 → 85.0%), so the ordering is real information worth keeping |
+| **`ca` kept as one numeric column (median-imputed, scaled)** | ordinal | 0 < 1 < 2 < 3 vessels **is** a genuine ordering, and the disease rate rises monotonically (26.1 → 85.0%), so the ordering is real information worth keeping |
 | **No outlier removal** | — | Every value is physiologically plausible; removing real patients to make a chart tidier is data manipulation |
 | **No resampling** | — | 45.9/54.1 is near-balanced. Imbalance is handled at the *threshold*, not by inventing or discarding patients |
 
