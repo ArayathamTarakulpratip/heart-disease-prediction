@@ -53,6 +53,10 @@ def load_preset():
             st.session_state[col] = None if value is None or np.isnan(value) else int(value)
         else:
             st.session_state[col] = float(value)
+    # Reset what-if comparison when switching to a new preset patient
+    st.session_state["previous"] = None
+    st.session_state["last"] = None
+
 
 
 if not cfg.MODEL_PATH.exists():
@@ -162,9 +166,7 @@ with left:
     if previous is not None:
         changed = [c for c in active_features
                    if label(c, previous["inputs"][c]) != label(c, patient.iloc[0][c])]
-        if len(changed) > 4:
-            st.markdown(f"**A different patient:** {len(changed)} inputs changed since the previous result.")
-        elif changed:
+        if changed:
             changed_lines = "\n".join(
                 f"- **{cfg.DESCRIPTIONS[c]}** (`{c}`): `{label(c, previous['inputs'][c])}` → `{label(c, patient.iloc[0][c])}`"
                 for c in changed
@@ -172,8 +174,9 @@ with left:
             st.markdown(f"**Changed since the previous result:**\n{changed_lines}")
             
     if patient.iloc[0]["sex"] == 0:
-        st.info("The main model's sex subgroup estimates are based on small historical groups. "
-                "Review Low results carefully; notebook Section 13.3 reports counts and uncertainty.")
+        st.info("**Clinical note for female patients:** The historical dataset has a smaller female cohort (n=97). "
+                "Because coronary disease presentations in women can be atypical, interpret Low-risk scores with clinical vigilance.")
+
 
 with right:
     st.subheader("Why this risk? (Feature Contributions)")
