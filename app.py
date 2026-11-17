@@ -150,10 +150,13 @@ with left:
     )
     
     if result["tier"] == "Low":
-        st.info("**Low safety-net:** A clinician must review symptoms and tests before any deferral, "
-                "record a follow-up date and who will contact the patient, and give clear instructions "
-                "to seek urgent assessment for new or worsening chest pain or other concerning symptoms. "
-                "A Low score does not rule out disease.")
+        st.info(
+            "**Mandatory Safety-Net Protocol (Low Tier):**\n\n"
+            "- Clinician must review symptoms and tests before any deferral.\n"
+            "- Record a **follow-up date** and designated contact clinician.\n"
+            "- Provide clear instructions to seek urgent care for new or worsening symptoms.\n\n"
+            "*A Low score does not rule out coronary disease.*"
+        )
                 
     if st.session_state["full_model"]:
         full_risk = float(artifact["pipeline"].predict_proba(patient[cfg.FEATURES])[0, 1])
@@ -174,8 +177,12 @@ with left:
             st.markdown(f"**Changed since the previous result:**\n{changed_lines}")
             
     if patient.iloc[0]["sex"] == 0:
-        st.info("**Clinical note for female patients:** The historical dataset has a smaller female cohort (n=97). "
-                "Because coronary disease presentations in women can be atypical, interpret Low-risk scores with clinical vigilance.")
+        st.markdown(
+            "> **Subgroup Caution (Female Cohort):** The historical training dataset has a smaller female "
+            "cohort (n=97). Because coronary disease presentations in women can be atypical, "
+            "interpret Low-risk scores with clinical vigilance."
+        )
+
 
 
 with right:
