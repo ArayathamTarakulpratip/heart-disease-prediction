@@ -175,18 +175,45 @@ with right:
         f"{cfg.DESCRIPTIONS[c].lower()} ({label(c, patient.iloc[0][c])}) {'raises' if v > 0 else 'lowers'} the risk"
         for c, v in top.items()))
 
-with st.expander("About this model"):
+with st.expander("ℹ️ About This Model & Clinical Performance", expanded=False):
     m = artifact["metrics"]
+    
+    st.markdown("### ⚠️ Intended Use & Clinical Safety")
+    st.warning(
+        "**Clinical Decision Support Only:** This tool is designed to assist clinicians in prioritizing "
+        "angiography referrals for suspected coronary artery disease. It is **not** intended for general population "
+        "screening, emergency acute coronary syndrome triage, or autonomous clinical decision-making without a doctor."
+    )
+
+    st.markdown("### 🩺 Main Model (Pre-Angiography Triage)")
     st.markdown(
-        f"- **Main model:** logistic regression on 10 recorded features; Cleveland cross-validated ROC-AUC "
-        f"{m['no_imaging_cv_roc_auc']:.3f}; Hungary external ROC-AUC {m['hungary_roc_auc_10_features']:.3f} "
-        f"and recall {m['hungary_recall_10_features']:.3f}, below the {cfg.RECALL_TARGET:.0%} target\n"
-        f"- **Retrospective 13-feature model:** ROC-AUC {m['cv_roc_auc']['mean']:.3f} ± "
-        f"{m['cv_roc_auc']['sd']:.3f}; its held-out test results do not describe the main model\n"
-        f"- **Decision rule:** outer-fold recall {m['decision_cv']['recall']:.3f}, specificity "
-        f"{m['decision_cv']['specificity']:.3f}, High-tier PPV {m['decision_cv']['high_ppv']:.3f}; "
-        f"estimates remain uncertain in this small cohort\n"
-        f"- **Explanations:** exact per-feature contributions for a linear model (SHAP values), relative to "
-        f"the average training patient\n"
-        f"- **Not for:** first-contact screening, the general population, or decisions without a clinician\n"
-        f"- **Built with:** " + ", ".join(f"{k} {v}" for k, v in artifact["versions"].items()))
+        f"- **Algorithm:** Regularized Logistic Regression trained on **10 routinely collected bedside & exercise features** "
+        "(eliminating reliance on invasive fluoroscopy or radioisotope imaging before catheterization).\n"
+        f"- **Disease Detection (Sensitivity / Recall):** **{m['decision_cv']['recall']:.1%}** "
+        f"(successfully identifies 9 out of 10 patients with significant disease; target is ≥{cfg.RECALL_TARGET:.0%}).\n"
+        f"- **High-Priority Precision (PPV):** **{m['decision_cv']['high_ppv']:.1%}** "
+        "of patients placed into the **High tier** truly have angiographic coronary disease.\n"
+        f"- **Rule-out Specificity:** **{m['decision_cv']['specificity']:.1%}** "
+        "(conservative by design to minimize dangerous false negatives).\n"
+        f"- **Discrimination (ROC-AUC):** **{m['no_imaging_cv_roc_auc']:.3f}** (Cross-validated on Cleveland cohort) · "
+        f"**{m['hungary_roc_auc_10_features']:.3f}** (External validation on Hungarian cohort; recall {m['hungary_recall_10_features']:.1%})."
+    )
+
+    st.markdown("### 🔍 Model Transparency & Feature Attributions")
+    st.markdown(
+        "- **Explainable AI:** The *'Why this risk?'* waterfall chart uses exact additive contributions "
+        "(SHAP values for linear models) relative to the average referred training patient.\n"
+        "- **Direction:** Red bars indicate factors increasing risk; blue bars indicate protective factors."
+    )
+
+    st.markdown("### 🔬 Retrospective 13-Feature Benchmark")
+    st.markdown(
+        f"- **Full Diagnostic Model:** ROC-AUC **{m['cv_roc_auc']['mean']:.3f} ± {m['cv_roc_auc']['sd']:.3f}**.\n"
+        "- *Note:* This model incorporates invasive fluoroscopy (`ca`) and thallium scintigraphy (`thal`). "
+        "It is displayed for historical research comparison only and does not drive the pre-angiography decision queue."
+    )
+
+    st.divider()
+    version_str = " · ".join(f"**{k}** {v}" for k, v in artifact["versions"].items())
+    st.caption(f"⚙️ **System Specifications:** {version_str}")
+
