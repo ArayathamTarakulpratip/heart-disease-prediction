@@ -98,7 +98,6 @@ with st.sidebar:
 
 # ---------------------------------------------------------------- main: risk, tier, explanation
 st.title("Heart Disease Triage Decision Support")
-st.caption("Pre-angiography risk stratification using 10 non-invasive bedside and exercise measures (excludes fluoroscopy `ca`, thallium `thal`, and `slope`).")
 st.warning("**Decision support, not diagnosis.** A proof of concept trained on UCI Cleveland data; "
            "the clinician makes the final decision. Suspected acute coronary syndrome needs urgent assessment "
            "regardless of this score.")
