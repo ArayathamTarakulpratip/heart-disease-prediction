@@ -20,7 +20,7 @@ st.set_page_config(page_title="Heart Disease Triage", layout="wide")
 FORM_LIMITS = {"age": (1.0, 120.0, 1.0), "trestbps": (40.0, 300.0, 1.0), "chol": (50.0, 1000.0, 1.0),
                "thalach": (30.0, 260.0, 1.0), "oldpeak": (0.0, 10.0, 0.1)}
 NOT_MEASURED = "not measured"
-TIER_STYLE = {"High": ("#E45756", "🔴"), "Medium": ("#F2A541", "🟠"), "Low": ("#4C78A8", "🔵")}
+TIER_STYLE = {"High": "#E45756", "Medium": "#F2A541", "Low": "#4C78A8"}
 SECTIONS = {
     "Patient": ["age", "sex", "trestbps", "chol", "fbs"],
     "Symptoms and resting ECG": ["cp", "restecg"],
@@ -73,9 +73,9 @@ if "preset" not in st.session_state:                       # first visit: start 
 
 # ---------------------------------------------------------------- sidebar: patient form
 with st.sidebar:
-    st.header("📋 Clinical Inputs")
+    st.header("Clinical Inputs")
     st.selectbox("Load a demo patient", list(presets), key="preset", on_change=load_preset)
-    st.caption(f"💡 *{presets[st.session_state['preset']]['description']}.* You can adjust any input below to explore what-if scenarios.")
+    st.caption(f"*{presets[st.session_state['preset']]['description']}.* You can adjust any input below to explore what-if scenarios.")
     st.divider()
     
     st.toggle("Compare with 13-feature retrospective model", key="full_model")
@@ -93,11 +93,11 @@ with st.sidebar:
                                 format="%.1f" if step < 1 else "%.0f")
 
 # ---------------------------------------------------------------- main: risk, tier, explanation
-st.title("🫀 Heart Disease Triage Decision Support")
+st.title("Heart Disease Triage Decision Support")
 st.caption("Pre-angiography risk stratification using 10 non-invasive bedside and exercise measures (excludes fluoroscopy `ca`, thallium `thal`, and `slope`).")
 st.warning("**Decision support, not diagnosis.** A proof of concept trained on UCI Cleveland data; "
            "the clinician makes the final decision. Suspected acute coronary syndrome needs urgent assessment "
-           "regardless of this score.", icon="⚠️")
+           "regardless of this score.")
 
 patient = pd.DataFrame([{col: (np.nan if st.session_state[col] is None else float(st.session_state[col]))
                          for col in cfg.FEATURES}])
@@ -118,7 +118,7 @@ if last is not None and not pd.Series(last["inputs"])[active_features].equals(pa
 previous = st.session_state.get("previous")
 st.session_state["last"] = {"risk": risk, "tier": result["tier"], "inputs": patient.iloc[0].to_dict()}
 
-color, icon = TIER_STYLE[result["tier"]]
+color = TIER_STYLE[result["tier"]]
 left, right = st.columns([1.1, 1.9], gap="large")
 
 with left:
@@ -129,7 +129,7 @@ with left:
         f"""
         <div style='background-color:{color}; color:white; padding:1rem 1.2rem; border-radius:0.6rem; margin:0.8rem 0 1rem 0; box-shadow:0 2px 4px rgba(0,0,0,0.08);'>
             <div style='font-size:1.3rem; font-weight:700; margin-bottom:0.3rem;'>
-                {icon} {result['tier']} Priority Tier
+                {result['tier']} Priority Tier
             </div>
             <div style='font-size:0.95rem; font-weight:500; opacity:0.95;'>
                 <b>Recommended Action:</b> {result['action']}
@@ -146,7 +146,7 @@ with left:
     )
     
     if result["tier"] == "Low":
-        st.info("🛡️ **Low safety-net:** A clinician must review symptoms and tests before any deferral, "
+        st.info("**Low safety-net:** A clinician must review symptoms and tests before any deferral, "
                 "record a follow-up date and who will contact the patient, and give clear instructions "
                 "to seek urgent assessment for new or worsening chest pain or other concerning symptoms. "
                 "A Low score does not rule out disease.")
@@ -156,28 +156,28 @@ with left:
         full_tier = triage.triage(full_risk, artifact["thresholds"])["tier"]
         st.metric("Retrospective 13-feature risk", f"{full_risk:.1%}",
                   delta=f"{100 * (full_risk - risk):+.1f} pts vs pre-angiography model", delta_color="off")
-        st.caption(f"🔬 **{full_tier} tier** on separate cut-offs. This comparison uses fluoroscopy (`ca`), "
+        st.caption(f"**{full_tier} tier** on separate cut-offs. This comparison uses fluoroscopy (`ca`), "
                    "thallium imaging (`thal`) and stress ECG slope, so it is not the queue decision.")
                    
     if previous is not None:
         changed = [c for c in active_features
                    if label(c, previous["inputs"][c]) != label(c, patient.iloc[0][c])]
         if len(changed) > 4:
-            st.markdown(f"👥 **A different patient:** {len(changed)} inputs changed since the previous result.")
+            st.markdown(f"**A different patient:** {len(changed)} inputs changed since the previous result.")
         elif changed:
             changed_lines = "\n".join(
                 f"- **{cfg.DESCRIPTIONS[c]}** (`{c}`): `{label(c, previous['inputs'][c])}` → `{label(c, patient.iloc[0][c])}`"
                 for c in changed
             )
-            st.markdown(f"✏️ **Changed since the previous result:**\n{changed_lines}")
+            st.markdown(f"**Changed since the previous result:**\n{changed_lines}")
             
     if patient.iloc[0]["sex"] == 0:
-        st.info("ℹ️ The main model's sex subgroup estimates are based on small historical groups. "
+        st.info("The main model's sex subgroup estimates are based on small historical groups. "
                 "Review Low results carefully; notebook Section 13.3 reports counts and uncertainty.")
 
 with right:
-    st.subheader("📊 Why this risk? (Feature Contributions)")
-    st.caption("How each clinical measurement pushes estimated risk higher (🔴 red) or lower (🔵 blue) relative to an average referred patient.")
+    st.subheader("Why this risk? (Feature Contributions)")
+    st.caption("How each clinical measurement pushes estimated risk higher (red) or lower (blue) relative to an average referred patient.")
     
     chart = pd.DataFrame({
         "factor": [f"{cfg.DESCRIPTIONS[c]}: {label(c, patient.iloc[0][c])}" for c in contrib.index],
@@ -197,20 +197,20 @@ with right:
     )
     
     top = contrib.head(3)
-    st.markdown("##### 🔑 Strongest factors:")
+    st.markdown("##### Strongest factors:")
     factor_items = []
     for c, v in top.items():
-        direction_badge = "🔴 raises" if v > 0 else "🔵 lowers"
+        direction_badge = "raises" if v > 0 else "lowers"
         factor_items.append(f"- **{cfg.DESCRIPTIONS[c]}** (`{label(c, patient.iloc[0][c])}`): {direction_badge} the risk ({v:+.2f} log-odds)")
     st.markdown("\n".join(factor_items))
 
-with st.expander("ℹ️ About This Model & Clinical Performance", expanded=False):
+with st.expander("About This Model & Clinical Performance", expanded=False):
     m = artifact["metrics"]
     
     tab_overview, tab_metrics, tab_retrospective = st.tabs([
-        "⚠️ Intended Use & Safety",
-        "🩺 10-Feature Main Model",
-        "🔬 Retrospective 13-Feature Benchmark"
+        "Intended Use & Safety",
+        "10-Feature Main Model",
+        "Retrospective 13-Feature Benchmark"
     ])
     
     with tab_overview:
@@ -250,6 +250,7 @@ with st.expander("ℹ️ About This Model & Clinical Performance", expanded=Fals
         
     st.divider()
     version_str = " · ".join(f"**{k}** {v}" for k, v in artifact["versions"].items())
-    st.caption(f"⚙️ **System Specifications:** {version_str}")
+    st.caption(f"**System Specifications:** {version_str}")
+
 
 
