@@ -73,9 +73,11 @@ if "preset" not in st.session_state:                       # first visit: start 
 
 # ---------------------------------------------------------------- sidebar: patient form
 with st.sidebar:
-    st.header("Inputs")
+    st.header("📋 Clinical Inputs")
     st.selectbox("Load a demo patient", list(presets), key="preset", on_change=load_preset)
-    st.caption(presets[st.session_state["preset"]]["description"] + ". Edit any value below to explore what-ifs.")
+    st.caption(f"💡 *{presets[st.session_state['preset']]['description']}.* You can adjust any input below to explore what-if scenarios.")
+    st.divider()
+    
     st.toggle("Compare with 13-feature retrospective model", key="full_model")
     for section, cols in SECTIONS.items():
         if section.startswith("Retrospective") and not st.session_state["full_model"]:
@@ -91,10 +93,10 @@ with st.sidebar:
                                 format="%.1f" if step < 1 else "%.0f")
 
 # ---------------------------------------------------------------- main: risk, tier, explanation
-st.title("Heart Disease Triage")
-st.caption("Pre-angiography prioritisation using 10 recorded features. The score excludes `ca`, `thal` and `slope`.")
-st.warning("**Decision support, not diagnosis.** A proof of concept trained on 1980s UCI Cleveland data; "
-           "the clinician makes the decision. Suspected acute coronary syndrome needs urgent assessment "
+st.title("🫀 Heart Disease Triage Decision Support")
+st.caption("Pre-angiography risk stratification using 10 non-invasive bedside and exercise measures (excludes fluoroscopy `ca`, thallium `thal`, and `slope`).")
+st.warning("**Decision support, not diagnosis.** A proof of concept trained on UCI Cleveland data; "
+           "the clinician makes the final decision. Suspected acute coronary syndrome needs urgent assessment "
            "regardless of this score.", icon="⚠️")
 
 patient = pd.DataFrame([{col: (np.nan if st.session_state[col] is None else float(st.session_state[col]))
@@ -117,52 +119,75 @@ previous = st.session_state.get("previous")
 st.session_state["last"] = {"risk": risk, "tier": result["tier"], "inputs": patient.iloc[0].to_dict()}
 
 color, icon = TIER_STYLE[result["tier"]]
-left, right = st.columns([1, 2])
+left, right = st.columns([1.1, 1.9], gap="large")
+
 with left:
     delta = None if previous is None else f"{100 * (risk - previous['risk']):+.1f} pts vs previous"
     st.metric("Estimated risk of significant coronary disease", f"{risk:.1%}", delta=delta, delta_color="inverse")
-    st.markdown(f"<div style='background:{color};color:white;padding:0.8rem 1rem;border-radius:0.5rem;"
-                f"font-size:1.3rem'>{icon} <b>{result['tier']} tier</b><br>{result['action']}</div>",
-                unsafe_allow_html=True)
-    st.caption(f"Tiers: Low below {thresholds['low']:.1%} · Medium from {thresholds['low']:.1%} · "
-               f"High from {thresholds['high']:.1%}. These cut-offs target {cfg.RECALL_TARGET:.0%} recall "
-               "on training predictions; outer-fold validation assesses the full rule separately.")
+    
+    st.markdown(
+        f"""
+        <div style='background-color:{color}; color:white; padding:1rem 1.2rem; border-radius:0.6rem; margin:0.8rem 0 1rem 0; box-shadow:0 2px 4px rgba(0,0,0,0.08);'>
+            <div style='font-size:1.3rem; font-weight:700; margin-bottom:0.3rem;'>
+                {icon} {result['tier']} Priority Tier
+            </div>
+            <div style='font-size:0.95rem; font-weight:500; opacity:0.95;'>
+                <b>Recommended Action:</b> {result['action']}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    st.caption(
+        f"**Thresholds:** Low below {thresholds['low']:.1%} · Medium from {thresholds['low']:.1%} · "
+        f"High from {thresholds['high']:.1%}. Targets {cfg.RECALL_TARGET:.0%} recall "
+        "on training predictions; outer-fold validation assesses the full rule separately."
+    )
+    
     if result["tier"] == "Low":
-        st.info("**Low safety-net:** A clinician must review symptoms and tests before any deferral, "
+        st.info("🛡️ **Low safety-net:** A clinician must review symptoms and tests before any deferral, "
                 "record a follow-up date and who will contact the patient, and give clear instructions "
                 "to seek urgent assessment for new or worsening chest pain or other concerning symptoms. "
                 "A Low score does not rule out disease.")
+                
     if st.session_state["full_model"]:
         full_risk = float(artifact["pipeline"].predict_proba(patient[cfg.FEATURES])[0, 1])
         full_tier = triage.triage(full_risk, artifact["thresholds"])["tier"]
         st.metric("Retrospective 13-feature risk", f"{full_risk:.1%}",
                   delta=f"{100 * (full_risk - risk):+.1f} pts vs pre-angiography model", delta_color="off")
-        st.caption(f"{full_tier} tier on separate cut-offs. This comparison uses fluoroscopy (`ca`), "
+        st.caption(f"🔬 **{full_tier} tier** on separate cut-offs. This comparison uses fluoroscopy (`ca`), "
                    "thallium imaging (`thal`) and stress ECG slope, so it is not the queue decision.")
+                   
     if previous is not None:
         changed = [c for c in active_features
                    if label(c, previous["inputs"][c]) != label(c, patient.iloc[0][c])]
         if len(changed) > 4:
-            st.markdown(f"**A different patient:** {len(changed)} inputs changed since the previous result.")
+            st.markdown(f"👥 **A different patient:** {len(changed)} inputs changed since the previous result.")
         elif changed:
-            st.markdown("**Changed since the previous result:** " + "; ".join(
-                f"{cfg.DESCRIPTIONS[c]} (`{c}`): {label(c, previous['inputs'][c])} → {label(c, patient.iloc[0][c])}"
-                for c in changed))
+            changed_lines = "\n".join(
+                f"- **{cfg.DESCRIPTIONS[c]}** (`{c}`): `{label(c, previous['inputs'][c])}` → `{label(c, patient.iloc[0][c])}`"
+                for c in changed
+            )
+            st.markdown(f"✏️ **Changed since the previous result:**\n{changed_lines}")
+            
     if patient.iloc[0]["sex"] == 0:
-        st.info("The main model's sex subgroup estimates are based on small historical groups. "
+        st.info("ℹ️ The main model's sex subgroup estimates are based on small historical groups. "
                 "Review Low results carefully; notebook Section 13.3 reports counts and uncertainty.")
 
 with right:
-    st.subheader("Why this risk?")
+    st.subheader("📊 Why this risk? (Feature Contributions)")
+    st.caption("How each clinical measurement pushes estimated risk higher (🔴 red) or lower (🔵 blue) relative to an average referred patient.")
+    
     chart = pd.DataFrame({
         "factor": [f"{cfg.DESCRIPTIONS[c]}: {label(c, patient.iloc[0][c])}" for c in contrib.index],
         "contribution": contrib.to_numpy(),
     })
     chart["direction"] = np.where(chart["contribution"] >= 0, "raises risk", "lowers risk")
+    
     st.altair_chart(
         alt.Chart(chart).mark_bar().encode(
             x=alt.X("contribution:Q", title="Push on log-odds vs the average training patient"),
-            # explicit order: with sort=None Vega keeps the previous chart's order for repeated labels
             y=alt.Y("factor:N", sort=list(chart["factor"]), title=None, axis=alt.Axis(labelLimit=420)),
             color=alt.Color("direction:N", scale=alt.Scale(domain=["raises risk", "lowers risk"],
                                                            range=["#E45756", "#4C78A8"]), legend=None),
@@ -170,50 +195,61 @@ with right:
         ).properties(height=380),
         width="stretch",
     )
+    
     top = contrib.head(3)
-    st.markdown("**Strongest factors:** " + "; ".join(
-        f"{cfg.DESCRIPTIONS[c].lower()} ({label(c, patient.iloc[0][c])}) {'raises' if v > 0 else 'lowers'} the risk"
-        for c, v in top.items()))
+    st.markdown("##### 🔑 Strongest factors:")
+    factor_items = []
+    for c, v in top.items():
+        direction_badge = "🔴 raises" if v > 0 else "🔵 lowers"
+        factor_items.append(f"- **{cfg.DESCRIPTIONS[c]}** (`{label(c, patient.iloc[0][c])}`): {direction_badge} the risk ({v:+.2f} log-odds)")
+    st.markdown("\n".join(factor_items))
 
 with st.expander("ℹ️ About This Model & Clinical Performance", expanded=False):
     m = artifact["metrics"]
     
-    st.markdown("### ⚠️ Intended Use & Clinical Safety")
-    st.warning(
-        "**Clinical Decision Support Only:** This tool is designed to assist clinicians in prioritizing "
-        "angiography referrals for suspected coronary artery disease. It is **not** intended for general population "
-        "screening, emergency acute coronary syndrome triage, or autonomous clinical decision-making without a doctor."
-    )
-
-    st.markdown("### 🩺 Main Model (Pre-Angiography Triage)")
-    st.markdown(
-        f"- **Algorithm:** Regularized Logistic Regression trained on **10 routinely collected bedside & exercise features** "
-        "(eliminating reliance on invasive fluoroscopy or radioisotope imaging before catheterization).\n"
-        f"- **Disease Detection (Sensitivity / Recall):** **{m['decision_cv']['recall']:.1%}** "
-        f"(successfully identifies 9 out of 10 patients with significant disease; target is ≥{cfg.RECALL_TARGET:.0%}).\n"
-        f"- **High-Priority Precision (PPV):** **{m['decision_cv']['high_ppv']:.1%}** "
-        "of patients placed into the **High tier** truly have angiographic coronary disease.\n"
-        f"- **Rule-out Specificity:** **{m['decision_cv']['specificity']:.1%}** "
-        "(conservative by design to minimize dangerous false negatives).\n"
-        f"- **Discrimination (ROC-AUC):** **{m['no_imaging_cv_roc_auc']:.3f}** (Cross-validated on Cleveland cohort) · "
-        f"**{m['hungary_roc_auc_10_features']:.3f}** (External validation on Hungarian cohort; recall {m['hungary_recall_10_features']:.1%})."
-    )
-
-    st.markdown("### 🔍 Model Transparency & Feature Attributions")
-    st.markdown(
-        "- **Explainable AI:** The *'Why this risk?'* waterfall chart uses exact additive contributions "
-        "(SHAP values for linear models) relative to the average referred training patient.\n"
-        "- **Direction:** Red bars indicate factors increasing risk; blue bars indicate protective factors."
-    )
-
-    st.markdown("### 🔬 Retrospective 13-Feature Benchmark")
-    st.markdown(
-        f"- **Full Diagnostic Model:** ROC-AUC **{m['cv_roc_auc']['mean']:.3f} ± {m['cv_roc_auc']['sd']:.3f}**.\n"
-        "- *Note:* This model incorporates invasive fluoroscopy (`ca`) and thallium scintigraphy (`thal`). "
-        "It is displayed for historical research comparison only and does not drive the pre-angiography decision queue."
-    )
-
+    tab_overview, tab_metrics, tab_retrospective = st.tabs([
+        "⚠️ Intended Use & Safety",
+        "🩺 10-Feature Main Model",
+        "🔬 Retrospective 13-Feature Benchmark"
+    ])
+    
+    with tab_overview:
+        st.warning(
+            "**Clinical Decision Support Only:** This tool is designed to assist clinicians in prioritizing "
+            "elective angiography referrals for suspected coronary artery disease. It is **not** intended for general population "
+            "screening, emergency acute coronary syndrome triage, or autonomous clinical decision-making without a physician."
+        )
+        st.markdown(
+            "- **Target Population:** Outpatients or referred patients being considered for elective coronary catheterization.\n"
+            "- **Safe Protocol:** A *Low* recommendation does not rule out coronary disease; it mandates a documented safety-net plan "
+            "with structured clinician review before any procedure deferral."
+        )
+        
+    with tab_metrics:
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.markdown(
+                f"- **Algorithm:** Regularized Logistic Regression\n"
+                f"- **Input Features:** 10 routinely recorded bedside & exercise measures\n"
+                f"- **Sensitivity (Disease Recall):** **{m['decision_cv']['recall']:.1%}** (identifies ~9 in 10 diseased cases)\n"
+                f"- **High-Tier Precision (PPV):** **{m['decision_cv']['high_ppv']:.1%}** of High tier cases have confirmed disease"
+            )
+        with col_m2:
+            st.markdown(
+                f"- **Rule-out Specificity:** **{m['decision_cv']['specificity']:.1%}** (intentionally conservative for patient safety)\n"
+                f"- **Cleveland CV ROC-AUC:** **{m['no_imaging_cv_roc_auc']:.3f}**\n"
+                f"- **Hungary External ROC-AUC:** **{m['hungary_roc_auc_10_features']:.3f}** (External Recall: **{m['hungary_recall_10_features']:.1%}**)"
+            )
+            
+    with tab_retrospective:
+        st.markdown(
+            f"- **Full 13-Feature Model ROC-AUC:** **{m['cv_roc_auc']['mean']:.3f} ± {m['cv_roc_auc']['sd']:.3f}**\n"
+            "- **Why is it retrospective?** It incorporates invasive fluoroscopy (`ca`), thallium imaging (`thal`), and exercise ST slope (`slope`). "
+            "Because fluoroscopy is often obtained during catheterization itself, this model serves as an analytical reference rather than a pre-procedure queue tool."
+        )
+        
     st.divider()
     version_str = " · ".join(f"**{k}** {v}" for k, v in artifact["versions"].items())
     st.caption(f"⚙️ **System Specifications:** {version_str}")
+
 
