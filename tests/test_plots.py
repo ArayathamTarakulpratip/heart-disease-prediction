@@ -24,6 +24,7 @@ def test_plots_return_figures_without_warnings():
     _no_warning_figure(plots.class_balance, df)
     _no_warning_figure(plots.rate_by, df, ["sex", "cp"])
     _no_warning_figure(plots.age_vs_max_hr, df)
+    _no_warning_figure(plots.rate_by_bins, df, "oldpeak", [-1, 0, 1, 2, 10], ["a", "b", "c", "d"], "ST depression")
     _no_warning_figure(plots.by_disease, df, ["thalach", "oldpeak"])
     _no_warning_figure(plots.correlation, df)
 

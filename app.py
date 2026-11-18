@@ -93,7 +93,7 @@ with st.sidebar:
 # ---------------------------------------------------------------- main: risk, tier, explanation
 st.title("Heart Disease Triage")
 st.caption("Pre-angiography prioritisation using 10 recorded features. The score excludes `ca`, `thal` and `slope`.")
-st.warning("**Decision support, not diagnosis.** A proof of concept trained on 1980s UCI Cleveland data; "
+st.warning("**Decision support, not diagnosis.** A proof of concept trained on UCI Cleveland data; "
            "the clinician makes the decision. Suspected acute coronary syndrome needs urgent assessment "
            "regardless of this score.", icon="⚠️")
 

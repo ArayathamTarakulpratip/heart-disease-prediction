@@ -3,6 +3,7 @@ so notebook cells stay one line long. Imports only `config` from the package (no
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from matplotlib.ticker import PercentFormatter
 
 from cardiotriage import config as cfg
 
@@ -47,6 +48,23 @@ def rate_by(df: pd.DataFrame, cols: list[str]):
         ax.set(title=f"Disease rate: {cfg.DESCRIPTIONS.get(col, col)}", ylim=(0, 1.15),
                ylabel="Share with disease")
         ax.legend(loc="upper left", fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def rate_by_bins(df: pd.DataFrame, col: str, bins: list, labels: list[str], xlabel: str):
+    """Disease rate per band of a numeric column (`bins` are right-closed pd.cut edges), labelled with n."""
+    g = df.groupby(pd.cut(df[col], bins, labels=labels), observed=True)[cfg.TARGET].agg(["mean", "size"])
+    overall = df[cfg.TARGET].mean()
+    fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    ax.bar(range(len(g)), g["mean"].to_numpy(), color=PALETTE["Disease"], alpha=0.85)
+    for x, (rate, n) in enumerate(zip(g["mean"], g["size"])):
+        ax.text(x, rate, f"{rate:.0%}\nn={n}", ha="center", va="bottom", fontsize=10)
+    ax.axhline(overall, ls="--", color="grey", lw=1, label=f"overall {overall:.0%}")
+    ax.set_xticks(range(len(g)), list(g.index))
+    ax.set(title=f"Disease rate by {xlabel}", xlabel=xlabel, ylabel="Share with disease", ylim=(0, 1.15))
+    ax.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=0))
+    ax.legend(loc="upper left", fontsize=9)
     fig.tight_layout()
     return fig
 
